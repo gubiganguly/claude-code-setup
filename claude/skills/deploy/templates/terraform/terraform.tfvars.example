@@ -1,0 +1,48 @@
+###############################################################################
+# terraform.tfvars.example — copy to terraform.tfvars and fill in.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# terraform.tfvars is gitignored. terraform.tfvars.example IS checked in.
+###############################################################################
+
+# AWS region. PoC is locked to us-east-1.
+aws_region = "us-east-1"
+
+# Environment slug (used in tags). Single-env PoC.
+environment = "prod"
+
+# Project slug — used as prefix for resources, ECR repo, App Runner service.
+project_name = "csip"
+
+# ---------------------------------------------------------------------------
+# GitHub — drives the OIDC trust policy for the deploy workflow
+# ---------------------------------------------------------------------------
+
+github_owner  = "SNH-Capital"
+github_repo   = "csip"
+github_branch = "main"
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+
+db_name                 = "csip"
+db_username             = "csip_admin"
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage_gb = 20
+
+# ---------------------------------------------------------------------------
+# App sizing — the whole Next.js app runs in one App Runner service
+# ---------------------------------------------------------------------------
+
+backend_cpu    = "1 vCPU"
+backend_memory = "2 GB"
+
+# ---------------------------------------------------------------------------
+# Application secrets
+# ---------------------------------------------------------------------------
+
+# REQUIRED. Anthropic API key for the in-app AI features. Treat this value
+# like a password — never commit it. terraform.tfvars is in .gitignore.
+anthropic_api_key = "sk-ant-replace-me"

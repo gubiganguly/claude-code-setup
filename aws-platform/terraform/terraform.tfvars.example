@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars. Operator IPs allowed to reach the shared RDS
+# (needed by /deploy to provision project databases). Update when IP changes.
+admin_cidrs = ["YOUR.IP.HERE.0/32"]

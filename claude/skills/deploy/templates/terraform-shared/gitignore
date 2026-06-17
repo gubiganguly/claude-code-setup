@@ -1,0 +1,12 @@
+# Local state — contains the RDS master password + AUTH_SECRET in plaintext.
+*.tfstate
+*.tfstate.*
+
+# Provider plugins and local working dir.
+.terraform/
+
+# Secrets — never commit. terraform.tfvars.example IS committed.
+terraform.tfvars
+
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — commit it so
+# everyone resolves the same provider versions.

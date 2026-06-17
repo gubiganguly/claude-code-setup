@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. NEVER commit terraform.tfvars.
+
+project_name = "myproject"
+
+github_owner  = "SNH-Capital"
+github_repo   = "myproject"
+github_branch = "main"
+
+# aws apprunner list-vpc-connectors \
+#   --query "VpcConnectors[?VpcConnectorName=='platform-shared'].VpcConnectorArn" --output text
+platform_vpc_connector_arn = "arn:aws:apprunner:us-east-1:ACCOUNT:vpcconnector/platform-shared/1/XXXX"
+
+# App secrets — match variables.tf to this app's .env
+anthropic_api_key = "sk-ant-..."

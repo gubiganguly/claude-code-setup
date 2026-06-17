@@ -1,0 +1,7 @@
+# Local state is the source of truth — back it up, never commit it.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+crash.log

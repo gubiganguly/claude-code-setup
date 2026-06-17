@@ -1,0 +1,181 @@
+# ------------------------------------------------------------------------------
+# deploy.yml
+#
+# What it does:
+#   Builds the CSIP app Docker image (the whole full-stack Next.js app), pushes
+#   it to ECR (tags `:latest` and `:<short-sha>`), then explicitly triggers an
+#   App Runner deployment of the `csip` service and polls until it reaches
+#   RUNNING.
+#
+# When it triggers:
+#   - Push to `main` that touches app code, deps, the Dockerfile, or this
+#     workflow (production deploys).
+#   - `workflow_dispatch` for manual re-deploys (e.g. infra rollbacks, retries
+#     after a flaky App Runner deploy, or pushing a no-code change).
+#
+# What it needs:
+#   Required repo variables (Settings -> Secrets and variables -> Actions -> Variables tab):
+#     - AWS_DEPLOY_ROLE_ARN  IAM role ARN created by Terraform (output
+#                            `github_actions_role_arn`). Trust policy already
+#                            scopes assumption to this repo + branch via OIDC.
+#   Required repo secrets:
+#     - (none — OIDC means no static AWS keys are stored in GitHub.)
+#
+# Migration note:
+#   This workflow does NOT run database migrations. RDS is private and the
+#   container doesn't migrate on boot — run `prisma migrate deploy` against RDS
+#   out-of-band (see infra/README.md) when the schema changes.
+# ------------------------------------------------------------------------------
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "prisma/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - "next.config.ts"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+# OIDC requires id-token: write at the workflow (or job) level.
+permissions:
+  id-token: write
+  contents: read
+
+# Serialize deploys on main so two pushes can't race for the same App Runner
+# service. workflow_dispatch runs share the same group.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: csip
+  APP_RUNNER_SERVICE_NAME: csip
+
+jobs:
+  deploy:
+    name: Build, push to ECR, deploy App Runner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          # Distinct session name makes CloudTrail auditing of role assumptions
+          # easier to attribute back to a specific workflow run.
+          role-session-name: gha-deploy-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          REGISTRY="${{ steps.ecr-login.outputs.registry }}"
+          REPO="${{ env.ECR_REPOSITORY }}"
+          echo "sha_short=${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "image_latest=${REGISTRY}/${REPO}:latest" >> "$GITHUB_OUTPUT"
+          echo "image_sha=${REGISTRY}/${REPO}:${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # App Runner runs on amd64 — force the platform so a build from an
+          # arm64 runner/dev machine still produces a runnable image.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.image_latest }}
+            ${{ steps.tags.outputs.image_sha }}
+          # Use GitHub Actions cache for buildx layers — dramatically speeds up
+          # incremental builds when only src/ changed.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Resolve App Runner service ARN
+        id: apprunner
+        run: |
+          set -euo pipefail
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn | [0]" \
+            --output text)
+          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" = "None" ]; then
+            echo "App Runner service '${{ env.APP_RUNNER_SERVICE_NAME }}' not found." >&2
+            echo "Has Terraform been applied? Check 'aws apprunner list-services'." >&2
+            exit 1
+          fi
+          echo "service_arn=${SERVICE_ARN}" >> "$GITHUB_OUTPUT"
+          echo "Resolved service ARN: ${SERVICE_ARN}"
+
+      - name: Start App Runner deployment
+        id: deploy
+        run: |
+          set -euo pipefail
+          OP_ID=$(aws apprunner start-deployment \
+            --service-arn "${{ steps.apprunner.outputs.service_arn }}" \
+            --query "OperationId" \
+            --output text)
+          echo "operation_id=${OP_ID}" >> "$GITHUB_OUTPUT"
+          echo "Started App Runner deployment, OperationId=${OP_ID}"
+
+      - name: Wait for App Runner to reach RUNNING
+        run: |
+          set -euo pipefail
+          SERVICE_ARN="${{ steps.apprunner.outputs.service_arn }}"
+          # Poll for up to ~5 minutes (30 iterations * 10s = 300s).
+          for i in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --query "Service.Status" \
+              --output text)
+            echo "[$i/30] App Runner status: $STATUS"
+            case "$STATUS" in
+              RUNNING)
+                echo "App Runner deploy succeeded."
+                exit 0
+                ;;
+              CREATE_FAILED|DELETE_FAILED|OPERATION_IN_PROGRESS|PAUSED)
+                # OPERATION_IN_PROGRESS is expected mid-deploy; keep polling.
+                if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ] || [ "$STATUS" = "PAUSED" ]; then
+                  echo "App Runner reported terminal failure status: $STATUS" >&2
+                  exit 1
+                fi
+                ;;
+              *)
+                # Unknown / transient status — keep polling.
+                ;;
+            esac
+            sleep 10
+          done
+          echo "Timed out waiting for App Runner to reach RUNNING (5 min)." >&2
+          exit 1
+
+      - name: Echo deploy result
+        run: |
+          set -euo pipefail
+          SERVICE_ARN="${{ steps.apprunner.outputs.service_arn }}"
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn "$SERVICE_ARN" \
+            --query "Service.ServiceUrl" \
+            --output text)
+          echo "::notice title=Deploy complete::Image ${{ steps.tags.outputs.image_sha }} live at https://${SERVICE_URL}"
+          echo "Deployed image: ${{ steps.tags.outputs.image_sha }}"
+          echo "Service URL:    https://${SERVICE_URL}"

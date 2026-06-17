@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.*
+*.md
+phases
+dev.db
+.playwright-mcp
+npm-debug.log*
+.DS_Store
+Dockerfile
+.dockerignore
