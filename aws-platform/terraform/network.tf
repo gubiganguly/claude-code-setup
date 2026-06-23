@@ -154,6 +154,26 @@ resource "aws_security_group" "app_runner_egress" {
   }
 }
 
+# Source SG for ALL projects' ECS Express Mode tasks. No ingress — Express
+# manages ALB→task ingress on its own service SG; this SG is what RDS trusts.
+resource "aws_security_group" "ecs_egress" {
+  name        = "platform-ecs-egress"
+  description = "Shared egress SG for ECS Express tasks"
+  vpc_id      = aws_vpc.main.id
+
+  egress {
+    description = "All egress (IGW/NAT covers internet, RDS SG covers DB)"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "platform-ecs-egress"
+  }
+}
+
 # Shared RDS SG: Postgres from App Runner services (via the egress SG) and
 # from the operator's IP (admin_cidrs) so /deploy can create per-project
 # databases and run migrations from the laptop. Update admin_cidrs in
@@ -169,6 +189,14 @@ resource "aws_security_group" "rds_sg" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.app_runner_egress.id]
+  }
+
+  ingress {
+    description     = "Postgres from ECS Express tasks"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs_egress.id]
   }
 
   dynamic "ingress" {

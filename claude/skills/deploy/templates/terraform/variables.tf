@@ -71,20 +71,22 @@ variable "db_allocated_storage_gb" {
 }
 
 # ---------------------------------------------------------------------------
-# App runtime sizing (App Runner). The whole Next.js app runs here, so we give
-# it a touch more headroom than a thin API would need.
+# App runtime sizing (Fargate task). Numeric CPU units / MiB of memory.
+# Valid CPU: 256, 512, 1024, 2048, 4096. Memory must be valid for the CPU.
+# The whole Next.js app runs here, so we give it a touch more headroom than a
+# thin API would need.
 # ---------------------------------------------------------------------------
 
-variable "backend_cpu" {
-  description = "App Runner CPU size (e.g. '0.25 vCPU', '0.5 vCPU', '1 vCPU')."
+variable "app_cpu" {
+  description = "Fargate task CPU units (e.g. '256', '512', '1024', '2048')."
   type        = string
-  default     = "1 vCPU"
+  default     = "1024"
 }
 
-variable "backend_memory" {
-  description = "App Runner memory size (e.g. '0.5 GB', '1 GB', '2 GB')."
+variable "app_memory" {
+  description = "Fargate task memory in MiB (e.g. '512', '1024', '2048')."
   type        = string
-  default     = "2 GB"
+  default     = "2048"
 }
 
 # ---------------------------------------------------------------------------
@@ -94,7 +96,7 @@ variable "backend_memory" {
 variable "anthropic_api_key" {
   description = <<-EOT
     REQUIRED. Anthropic API key used by the in-app AI features. Stored in
-    Secrets Manager and injected into App Runner as ANTHROPIC_API_KEY.
+    Secrets Manager and injected into the ECS task as ANTHROPIC_API_KEY.
     Treat this value like a password — never commit it.
   EOT
   type        = string

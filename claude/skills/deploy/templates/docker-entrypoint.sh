@@ -20,9 +20,9 @@ else
 fi
 
 # 3) Start the Next.js standalone server.
-# Force-bind to 0.0.0.0. Next's standalone server binds to $HOSTNAME, and the
-# container runtime (e.g. App Runner) sets HOSTNAME to the instance hostname —
-# which makes the server unreachable and fails health checks. Override it here.
+# Force-bind to 0.0.0.0. Next's standalone server binds to $HOSTNAME; if the
+# container runtime sets HOSTNAME to a non-routable value the server becomes
+# unreachable and fails ALB health checks. Override it here to be safe.
 export HOSTNAME=0.0.0.0
 export PORT="${PORT:-3000}"
 echo "[entrypoint] starting Next.js server on ${HOSTNAME}:${PORT}"

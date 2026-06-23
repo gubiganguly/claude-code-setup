@@ -1,11 +1,11 @@
 ###############################################################################
 # main.tf — Project deploy in SHARED-PLATFORM mode.
 #
-# This stack creates only the PER-PROJECT pieces: ECR repo, App Runner
-# service, app secrets, GitHub OIDC role, and a database + role on the shared
-# platform RDS. The VPC, NAT, RDS instance, and App Runner VPC connector are
-# owned by the platform stack (~/Development/aws-platform/terraform) and are
-# referenced here, never created.
+# This stack creates only the PER-PROJECT pieces: ECR repo, ECS Express Mode
+# service (+ its IAM roles), app secrets, GitHub OIDC role, ACM/CloudFront for
+# the domain, and a database + role on the shared platform RDS. The VPC, public
+# subnets, IGW, RDS instance, and shared ECS task SG are owned by the platform
+# stack (~/Development/aws-platform/terraform) and referenced here, never created.
 #
 # State: local backend (terraform.tfstate in this directory).
 ###############################################################################
@@ -15,8 +15,9 @@ terraform {
 
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+      source = "hashicorp/aws"
+      # aws_ecs_express_gateway_service landed in provider v6.23.0.
+      version = "~> 6.23"
     }
     random = {
       source  = "hashicorp/random"

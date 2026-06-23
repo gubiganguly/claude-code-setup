@@ -29,6 +29,11 @@ output "app_runner_egress_sg_id" {
   value       = aws_security_group.app_runner_egress.id
 }
 
+output "ecs_egress_sg_id" {
+  description = "Shared SG for ECS Express tasks — pass to each project's Express service (trusted by platform-rds-sg)."
+  value       = aws_security_group.ecs_egress.id
+}
+
 output "rds_address" {
   description = "Shared RDS hostname."
   value       = aws_db_instance.main.address

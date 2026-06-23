@@ -2,29 +2,28 @@
 # deploy.yml
 #
 # What it does:
-#   Builds the CSIP app Docker image (the whole full-stack Next.js app), pushes
-#   it to ECR (tags `:latest` and `:<short-sha>`), then explicitly triggers an
-#   App Runner deployment of the `csip` service and polls until it reaches
-#   RUNNING.
+#   Builds the full-stack Next.js app Docker image, pushes it to ECR (tags
+#   `:latest` and `:<short-sha>`), then deploys it to the project's Amazon ECS
+#   Express Mode service via the official AWS action, which creates-or-updates
+#   the service and waits for the deployment to reach a stable state.
 #
 # When it triggers:
 #   - Push to `main` that touches app code, deps, the Dockerfile, or this
 #     workflow (production deploys).
-#   - `workflow_dispatch` for manual re-deploys (e.g. infra rollbacks, retries
-#     after a flaky App Runner deploy, or pushing a no-code change).
+#   - `workflow_dispatch` for manual re-deploys.
 #
-# What it needs:
-#   Required repo variables (Settings -> Secrets and variables -> Actions -> Variables tab):
-#     - AWS_DEPLOY_ROLE_ARN  IAM role ARN created by Terraform (output
-#                            `github_actions_role_arn`). Trust policy already
-#                            scopes assumption to this repo + branch via OIDC.
-#   Required repo secrets:
-#     - (none — OIDC means no static AWS keys are stored in GitHub.)
+# What it needs (Settings -> Secrets and variables -> Actions -> Variables tab):
+#   - AWS_DEPLOY_ROLE_ARN          IAM role ARN (Terraform output
+#                                  `github_actions_role_arn`). OIDC-scoped to
+#                                  this repo + branch.
+#   - AWS_ECS_EXECUTION_ROLE_ARN   Terraform output `execution_role_arn`.
+#   - AWS_ECS_INFRA_ROLE_ARN       Terraform output `infra_role_arn`.
+#   Repo secrets: none (OIDC means no static AWS keys are stored in GitHub).
 #
 # Migration note:
-#   This workflow does NOT run database migrations. RDS is private and the
-#   container doesn't migrate on boot — run `prisma migrate deploy` against RDS
-#   out-of-band (see infra/README.md) when the schema changes.
+#   DB migrations + idempotent seeds run INSIDE the container on boot
+#   (docker-entrypoint.sh: `prisma migrate deploy` → seeds → server). This
+#   workflow does not run them out-of-band.
 # ------------------------------------------------------------------------------
 
 name: Deploy
@@ -38,6 +37,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "Dockerfile"
+      - "docker-entrypoint.sh"
       - "next.config.ts"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
@@ -47,8 +47,7 @@ permissions:
   id-token: write
   contents: read
 
-# Serialize deploys on main so two pushes can't race for the same App Runner
-# service. workflow_dispatch runs share the same group.
+# Serialize deploys on main so two pushes can't race for the same ECS service.
 concurrency:
   group: deploy-main
   cancel-in-progress: false
@@ -56,11 +55,11 @@ concurrency:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: csip
-  APP_RUNNER_SERVICE_NAME: csip
+  ECS_SERVICE_NAME: csip
 
 jobs:
   deploy:
-    name: Build, push to ECR, deploy App Runner
+    name: Build, push to ECR, deploy ECS Express
     runs-on: ubuntu-latest
 
     steps:
@@ -98,84 +97,34 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          # App Runner runs on amd64 — force the platform so a build from an
+          # Fargate runs on amd64 — force the platform so a build from an
           # arm64 runner/dev machine still produces a runnable image.
           platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.tags.outputs.image_latest }}
             ${{ steps.tags.outputs.image_sha }}
-          # Use GitHub Actions cache for buildx layers — dramatically speeds up
-          # incremental builds when only src/ changed.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Resolve App Runner service ARN
-        id: apprunner
-        run: |
-          set -euo pipefail
-          SERVICE_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='${{ env.APP_RUNNER_SERVICE_NAME }}'].ServiceArn | [0]" \
-            --output text)
-          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" = "None" ]; then
-            echo "App Runner service '${{ env.APP_RUNNER_SERVICE_NAME }}' not found." >&2
-            echo "Has Terraform been applied? Check 'aws apprunner list-services'." >&2
-            exit 1
-          fi
-          echo "service_arn=${SERVICE_ARN}" >> "$GITHUB_OUTPUT"
-          echo "Resolved service ARN: ${SERVICE_ARN}"
-
-      - name: Start App Runner deployment
+      # Creates the Express service on first run, updates the image on every
+      # run after, and waits for the deployment to reach a stable state.
+      # Express's UpdateExpressGatewayService is partial — passing only the
+      # image leaves env/secrets/sizing (managed by Terraform) untouched.
+      - name: Deploy to ECS Express Mode
         id: deploy
-        run: |
-          set -euo pipefail
-          OP_ID=$(aws apprunner start-deployment \
-            --service-arn "${{ steps.apprunner.outputs.service_arn }}" \
-            --query "OperationId" \
-            --output text)
-          echo "operation_id=${OP_ID}" >> "$GITHUB_OUTPUT"
-          echo "Started App Runner deployment, OperationId=${OP_ID}"
-
-      - name: Wait for App Runner to reach RUNNING
-        run: |
-          set -euo pipefail
-          SERVICE_ARN="${{ steps.apprunner.outputs.service_arn }}"
-          # Poll for up to ~5 minutes (30 iterations * 10s = 300s).
-          for i in $(seq 1 30); do
-            STATUS=$(aws apprunner describe-service \
-              --service-arn "$SERVICE_ARN" \
-              --query "Service.Status" \
-              --output text)
-            echo "[$i/30] App Runner status: $STATUS"
-            case "$STATUS" in
-              RUNNING)
-                echo "App Runner deploy succeeded."
-                exit 0
-                ;;
-              CREATE_FAILED|DELETE_FAILED|OPERATION_IN_PROGRESS|PAUSED)
-                # OPERATION_IN_PROGRESS is expected mid-deploy; keep polling.
-                if [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "DELETE_FAILED" ] || [ "$STATUS" = "PAUSED" ]; then
-                  echo "App Runner reported terminal failure status: $STATUS" >&2
-                  exit 1
-                fi
-                ;;
-              *)
-                # Unknown / transient status — keep polling.
-                ;;
-            esac
-            sleep 10
-          done
-          echo "Timed out waiting for App Runner to reach RUNNING (5 min)." >&2
-          exit 1
+        uses: aws-actions/amazon-ecs-deploy-express-service@v1
+        with:
+          service-name: ${{ env.ECS_SERVICE_NAME }}
+          cluster: default
+          image: ${{ steps.tags.outputs.image_sha }}
+          execution-role-arn: ${{ vars.AWS_ECS_EXECUTION_ROLE_ARN }}
+          infrastructure-role-arn: ${{ vars.AWS_ECS_INFRA_ROLE_ARN }}
+          container-port: "3000"
+          health-check-path: /api/health
 
       - name: Echo deploy result
         run: |
-          set -euo pipefail
-          SERVICE_ARN="${{ steps.apprunner.outputs.service_arn }}"
-          SERVICE_URL=$(aws apprunner describe-service \
-            --service-arn "$SERVICE_ARN" \
-            --query "Service.ServiceUrl" \
-            --output text)
-          echo "::notice title=Deploy complete::Image ${{ steps.tags.outputs.image_sha }} live at https://${SERVICE_URL}"
+          echo "::notice title=Deploy complete::Image ${{ steps.tags.outputs.image_sha }} live (ECS Express endpoint: ${{ steps.deploy.outputs.endpoint }})"
           echo "Deployed image: ${{ steps.tags.outputs.image_sha }}"
-          echo "Service URL:    https://${SERVICE_URL}"
+          echo "Express endpoint: ${{ steps.deploy.outputs.endpoint }}"

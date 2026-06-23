@@ -24,20 +24,24 @@ Not every project has all three. Only include sections relevant to the repo.
 - **Backend**: Python FastAPI
 - **Database**: PostgreSQL — always. Locally via Homebrew Postgres; in production
   via AWS RDS PostgreSQL. Don't introduce other databases without asking.
-- **Hosting**: AWS (account 346698404534, default region `us-east-1`), App Runner
-  for containers, RDS for the database, Terraform for infra, GitHub Actions + OIDC
-  for CI/CD.
+- **Hosting**: AWS (account 346698404534, default region `us-east-1`), Amazon ECS
+  Express Mode (Fargate) for containers, RDS for the database, Terraform for infra,
+  GitHub Actions + OIDC for CI/CD. (App Runner is deprecated — AWS stopped accepting
+  new customers on 2026-04-30; existing App Runner services keep running, but all
+  new deploys go to ECS Express Mode.)
 - **Deploying**: use the `/deploy` skill. First deploy = `terraform apply`; every
   deploy after = `git push`. Never hand-roll AWS infra outside that pattern.
-- **Domains**: every deployed app gets `<project>.apps.snhcap.com` (Route 53
-  zone owned by the platform stack, delegated from GoDaddy; certificates
-  auto-issued/renewed). Always share and report the branded URL — never the raw
-  `*.awsapprunner.com` one, which Microsoft Defender flags as suspicious.
+- **Domains**: every deployed app gets `<project>.apps.snhcap.com`, served by
+  CloudFront in front of the ECS Express service (Route 53 zone owned by the
+  platform stack, delegated from GoDaddy; ACM cert auto-issued/renewed). Always
+  share and report the branded URL — never the raw `*.on.aws` Express URL, which
+  Microsoft Defender flags as suspicious.
 - **Shared platform**: small projects deploy in the skill's SHARED mode onto the
-  standing platform stack at `~/Development/aws-platform` (shared VPC/NAT +
-  `platform-db` RDS + `platform-shared` App Runner connector, ~$5/mo per project).
-  Never `terraform destroy` the platform stack — all shared-mode databases live
-  on it. Dedicated mode (own VPC+RDS) is only for isolation-sensitive apps.
+  standing platform stack at `~/Development/aws-platform` (shared VPC +
+  `platform-db` RDS; ECS Express tasks run in the platform public subnets wearing
+  the `platform-ecs-egress` SG, sharing one ALB across services). Never
+  `terraform destroy` the platform stack — all shared-mode databases live on it.
+  Dedicated mode (own VPC+RDS, no NAT) is only for isolation-sensitive apps.
 
 ---
 

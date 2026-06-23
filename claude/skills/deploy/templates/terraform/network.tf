@@ -1,9 +1,9 @@
 ###############################################################################
-# network.tf — VPC, subnets, NAT, security groups
+# network.tf — VPC, subnets, security groups
 #
 # Layout:
 #   10.30.0.0/16   VPC
-#     10.30.1.0/24 public  AZ a   (NAT + IGW attachment)
+#     10.30.1.0/24 public  AZ a   (IGW — ECS Express tasks + ALB)
 #     10.30.2.0/24 public  AZ b
 #     10.30.11.0/24 private AZ a  (RDS)
 #     10.30.12.0/24 private AZ b  (RDS)
@@ -11,9 +11,11 @@
 # CIDR is 10.30.x (not 10.20.x) on purpose so this never collides with the
 # LBMC Quoting stack if the two ever share an account.
 #
-# App Runner is run as a managed service outside the VPC. The VPC Connector
-# pins egress to the PUBLIC subnets so the NAT route lets it talk to ECR,
-# Secrets Manager, and the RDS endpoint (which lives in the private subnets).
+# ECS Express Mode tasks run in the PUBLIC subnets: Express then provisions an
+# internet-facing ALB and gives the tasks public IPs for egress via the IGW
+# (no NAT gateway needed — that's a ~$32/mo saving vs the old App Runner setup).
+# Tasks reach RDS in the private subnets over the in-VPC local route, gated by
+# the RDS security group (which trusts the ECS task SG below).
 ###############################################################################
 
 locals {
@@ -34,7 +36,7 @@ resource "aws_vpc" "main" {
 }
 
 # ---------------------------------------------------------------------------
-# Public subnets + IGW
+# Public subnets + IGW (ECS Express tasks + internet-facing ALB live here)
 # ---------------------------------------------------------------------------
 
 resource "aws_subnet" "public" {
@@ -78,7 +80,7 @@ resource "aws_route_table_association" "public" {
 }
 
 # ---------------------------------------------------------------------------
-# Private subnets + single NAT (PoC scope — one NAT, not one per AZ)
+# Private subnets (RDS only — no NAT, no internet route; reachable in-VPC)
 # ---------------------------------------------------------------------------
 
 resource "aws_subnet" "private" {
@@ -93,34 +95,10 @@ resource "aws_subnet" "private" {
   }
 }
 
-resource "aws_eip" "nat" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.project_name}-nat-eip"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
-
-  tags = {
-    Name = "${var.project_name}-nat"
-  }
-
-  depends_on = [aws_internet_gateway.main]
-}
-
+# Plain route table (implicit local route only) so the private subnets have no
+# path to the internet — RDS doesn't need one.
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  }
 
   tags = {
     Name = "${var.project_name}-private-rt"
@@ -137,16 +115,16 @@ resource "aws_route_table_association" "private" {
 # Security groups
 # ---------------------------------------------------------------------------
 
-# App Runner VPC Connector source SG. No ingress — App Runner is the client.
-# Egress wide open so it can pull from ECR public endpoints, Secrets Manager,
-# and reach RDS.
-resource "aws_security_group" "app_runner_egress" {
-  name        = "${var.project_name}-app-runner-egress"
-  description = "Egress SG for App Runner VPC connector"
+# ECS Express task SG. No ingress here — Express manages ALB→task ingress on
+# its own service SG; this SG is what RDS trusts. Egress wide open so tasks can
+# pull from ECR / Secrets Manager (via IGW) and reach RDS.
+resource "aws_security_group" "ecs_tasks" {
+  name        = "${var.project_name}-ecs-tasks"
+  description = "Egress SG for ECS Express tasks (trusted by RDS)"
   vpc_id      = aws_vpc.main.id
 
   egress {
-    description = "All egress (NAT covers internet, RDS SG covers DB)"
+    description = "All egress (IGW covers internet, RDS SG covers DB)"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -154,22 +132,22 @@ resource "aws_security_group" "app_runner_egress" {
   }
 
   tags = {
-    Name = "${var.project_name}-app-runner-egress"
+    Name = "${var.project_name}-ecs-tasks"
   }
 }
 
-# RDS SG — only accept 5432 from the App Runner egress SG.
+# RDS SG — only accept 5432 from the ECS task SG.
 resource "aws_security_group" "rds_sg" {
   name        = "${var.project_name}-rds-sg"
-  description = "Postgres access from App Runner only"
+  description = "Postgres access from ECS Express tasks only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Postgres from App Runner VPC connector"
+    description     = "Postgres from ECS Express tasks"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.app_runner_egress.id]
+    security_groups = [aws_security_group.ecs_tasks.id]
   }
 
   egress {

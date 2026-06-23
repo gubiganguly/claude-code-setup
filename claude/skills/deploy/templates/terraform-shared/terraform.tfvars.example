@@ -6,9 +6,13 @@ github_owner  = "SNH-Capital"
 github_repo   = "myproject"
 github_branch = "main"
 
-# aws apprunner list-vpc-connectors \
-#   --query "VpcConnectors[?VpcConnectorName=='platform-shared'].VpcConnectorArn" --output text
-platform_vpc_connector_arn = "arn:aws:apprunner:us-east-1:ACCOUNT:vpcconnector/platform-shared/1/XXXX"
+# Shared platform PUBLIC subnets (ECS Express tasks run here → internet-facing ALB):
+#   cd ~/Development/aws-platform/terraform && terraform output -json public_subnet_ids
+platform_public_subnet_ids = ["subnet-aaaa", "subnet-bbbb"]
+
+# Shared `platform-ecs-egress` SG (trusted by platform-rds-sg):
+#   cd ~/Development/aws-platform/terraform && terraform output -raw ecs_egress_sg_id
+platform_ecs_security_group_id = "sg-XXXXXXXX"
 
 # App secrets — match variables.tf to this app's .env
 anthropic_api_key = "sk-ant-..."

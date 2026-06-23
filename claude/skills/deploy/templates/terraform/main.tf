@@ -1,8 +1,8 @@
 ###############################################################################
 # main.tf — Terraform + provider setup for the CSIP PoC
 #
-# CSIP is a single full-stack Next.js 16 app — server actions, Prisma, auth,
-# and AI all run inside the Next.js server. There is ONE App Runner service
+# This is a single full-stack Next.js app — server actions, Prisma, auth, and
+# AI all run inside the Next.js server. There is ONE ECS Express Mode service
 # running the whole container (no Amplify, no separate backend, no S3).
 #
 # State backend:
@@ -29,8 +29,9 @@ terraform {
 
   required_providers {
     aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
+      source = "hashicorp/aws"
+      # aws_ecs_express_gateway_service landed in provider v6.23.0.
+      version = "~> 6.23"
     }
     random = {
       source  = "hashicorp/random"

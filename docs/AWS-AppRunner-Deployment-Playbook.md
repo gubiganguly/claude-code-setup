@@ -1,5 +1,7 @@
 # AWS Deployment Playbook — Full-stack app → App Runner (the easy way)
 
+> ⚠️ Superseded 2026-06: deploys now use Amazon ECS Express Mode — see claude/skills/deploy/SKILL.md. This App Runner playbook is kept for historical reference.
+
 > **NOTE (2026-06-11):** this playbook describes DEDICATED mode (own VPC + RDS
 > per project, ~$50/mo). Since then a shared platform exists — most projects
 > should deploy in SHARED mode (~$5/mo) instead. See

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Production image for CSIP — Next.js 16 standalone server on AWS App Runner.
+# Production image — Next.js standalone server on Amazon ECS Express (Fargate).
 # Debian slim (glibc + openssl) keeps Prisma happy. Built for linux/amd64.
 
 FROM node:22-bookworm-slim AS base
@@ -38,7 +38,8 @@ COPY --from=build /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Migration toolchain — lets the container run `prisma migrate deploy` on boot.
+# Migration toolchain — lets the container run `prisma migrate deploy` on boot
+# (migrations + idempotent seeds run on every task start; see docker-entrypoint.sh).
 # The standalone trace ships only a minimal node_modules (no Prisma CLI / schema
 # engine and their transitive deps). Overlay the full node_modules so the CLI
 # and everything it needs are present; server.js works fine against the superset.

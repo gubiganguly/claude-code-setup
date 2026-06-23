@@ -4,14 +4,15 @@
 # Lets GitHub Actions assume an AWS role without long-lived access keys.
 # The role is allowed to:
 #   * push images to this project's ECR repo
-#   * trigger App Runner deployments on this project's service
+#   * create/update this project's ECS Express Mode service (the deploy action
+#     uses ecs:*ExpressGatewayService + RegisterTaskDefinition + UpdateService)
+#   * pass the execution + infrastructure roles to ECS
 #
 # Trust is scoped to the configured org/repo and the configured branch.
 ###############################################################################
 
 # The GitHub OIDC provider is account-wide and already exists in this account
-# (the LBMC stack created it — only one per URL is allowed). Reference the
-# existing one instead of creating a second.
+# (only one per URL is allowed). Reference it instead of creating a second.
 data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
@@ -42,7 +43,7 @@ data "aws_iam_policy_document" "github_actions_trust" {
 
 resource "aws_iam_role" "github_actions" {
   name               = "github-actions-${var.project_name}"
-  description        = "Assumed by GitHub Actions via OIDC to push images and trigger deploys"
+  description        = "Assumed by GitHub Actions via OIDC to push images and deploy the ECS Express service"
   assume_role_policy = data.aws_iam_policy_document.github_actions_trust.json
 
   tags = {
@@ -51,7 +52,7 @@ resource "aws_iam_role" "github_actions" {
 }
 
 data "aws_iam_policy_document" "github_actions_inline" {
-  # ECR auth token is account-wide, not resource-scoped
+  # ECR auth token is account-wide, not resource-scoped.
   statement {
     sid       = "EcrAuth"
     effect    = "Allow"
@@ -59,7 +60,7 @@ data "aws_iam_policy_document" "github_actions_inline" {
     resources = ["*"]
   }
 
-  # Push/pull to this project's repo only
+  # Push/pull to this project's repo only.
   statement {
     sid    = "EcrPushPull"
     effect = "Allow"
@@ -75,25 +76,38 @@ data "aws_iam_policy_document" "github_actions_inline" {
     resources = [aws_ecr_repository.app.arn]
   }
 
-  # Resolve the service ARN. ListServices is a list operation that does not
-  # support resource-level scoping, so it must target "*".
+  # Deploy the ECS Express service. These ECS actions don't support
+  # resource-level scoping for create/list, so they target "*"; the OIDC trust
+  # policy already scopes WHO can assume the role to this repo+branch.
   statement {
-    sid       = "AppRunnerList"
-    effect    = "Allow"
-    actions   = ["apprunner:ListServices"]
+    sid    = "EcsExpressDeploy"
+    effect = "Allow"
+    actions = [
+      "ecs:CreateCluster",
+      "ecs:DescribeClusters",
+      "ecs:CreateExpressGatewayService",
+      "ecs:UpdateExpressGatewayService",
+      "ecs:DescribeExpressGatewayService",
+      "ecs:RegisterTaskDefinition",
+      "ecs:DescribeServices",
+      "ecs:ListServices",
+      "ecs:UpdateService",
+      "elasticloadbalancing:DescribeLoadBalancers",
+      "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:DescribeListeners",
+    ]
     resources = ["*"]
   }
 
-  # Kick App Runner deploys and poll for RUNNING (scoped to this service).
-  # auto-deploy is on, but this also lets CI force-roll and wait on status.
+  # The deploy action passes the execution + infrastructure roles to ECS.
   statement {
-    sid    = "AppRunnerDeploy"
-    effect = "Allow"
-    actions = [
-      "apprunner:StartDeployment",
-      "apprunner:DescribeService",
+    sid     = "PassEcsRoles"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
+    resources = [
+      aws_iam_role.ecs_execution.arn,
+      aws_iam_role.ecs_infrastructure.arn,
     ]
-    resources = [aws_apprunner_service.app.arn]
   }
 }
 

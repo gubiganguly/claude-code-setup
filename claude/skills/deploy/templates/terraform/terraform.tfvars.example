@@ -12,7 +12,7 @@ aws_region = "us-east-1"
 # Environment slug (used in tags). Single-env PoC.
 environment = "prod"
 
-# Project slug — used as prefix for resources, ECR repo, App Runner service.
+# Project slug — used as prefix for resources, ECR repo, ECS Express service.
 project_name = "csip"
 
 # ---------------------------------------------------------------------------
@@ -33,11 +33,12 @@ db_instance_class       = "db.t4g.micro"
 db_allocated_storage_gb = 20
 
 # ---------------------------------------------------------------------------
-# App sizing — the whole Next.js app runs in one App Runner service
+# App sizing — the whole Next.js app runs in one ECS Express (Fargate) task.
+# Numeric Fargate units: CPU 256/512/1024/2048/4096, memory in MiB.
 # ---------------------------------------------------------------------------
 
-backend_cpu    = "1 vCPU"
-backend_memory = "2 GB"
+app_cpu    = "1024"
+app_memory = "2048"
 
 # ---------------------------------------------------------------------------
 # Application secrets

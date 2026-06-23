@@ -38,7 +38,7 @@ aws-platform/
   README.md                  Operating the shared platform (costs, IP changes,
                              graduation path, never-destroy warning).
   terraform/                 Source for the shared platform stack (VPC, NAT,
-                             RDS platform-db, App Runner connector).
+                             RDS platform-db, shared ALB, platform-ecs-egress SG).
                              NOTE: no tfstate/tfvars here — the LIVE stack and
                              its state live in ~/Development/aws-platform.
 
@@ -59,8 +59,9 @@ sync.sh                      ./sync.sh snapshot  — refresh this folder from th
 
 Code is written locally (Next.js frontend, FastAPI backend, Homebrew Postgres),
 pushed to GitHub over SSH, where GitHub Actions builds a Docker image, pushes
-it to ECR, and rolls the project's AWS App Runner service — migrations run on
-boot, health checks gate the traffic switch, so a broken build never goes live.
+it to ECR, and rolls the project's Amazon ECS Express Mode (Fargate) service —
+migrations run on boot, health checks gate the traffic switch, so a broken
+build never goes live.
 Data lives on a shared RDS Postgres instance (`platform-db`, one isolated
 database per project) inside a shared VPC — fixed ~$45/mo for the platform,
 ~$5/mo per deployed project. Each app gets a branded domain
@@ -77,4 +78,4 @@ This folder is a **copy**, not the live config. After meaningful changes to
 "./sync.sh" snapshot
 ```
 
-Snapshot last refreshed: 2026-06-11.
+Snapshot last refreshed: 2026-06-23.

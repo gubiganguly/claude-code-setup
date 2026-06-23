@@ -1,11 +1,11 @@
 ###############################################################################
 # ecr.tf — Container registry for the app image.
 #
-# GitHub Actions pushes `:latest` (and a git SHA tag) here. App Runner auto-
-# deploys when `:latest` changes.
+# GitHub Actions pushes `:latest` (and a git SHA tag) here, then rolls the ECS
+# Express service to the new image via the deploy workflow.
 #
-# CSIP is a single full-stack app, so the repo is just the project name (no
-# `-backend` suffix — there is no separate backend to disambiguate).
+# Single full-stack app → the repo is just the project name (no `-backend`
+# suffix — there is no separate backend to disambiguate).
 ###############################################################################
 
 resource "aws_ecr_repository" "app" {

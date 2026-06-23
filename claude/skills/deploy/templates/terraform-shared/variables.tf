@@ -19,11 +19,22 @@ variable "project_name" {
 # Shared platform wiring
 # ---------------------------------------------------------------------------
 
-variable "platform_vpc_connector_arn" {
+variable "platform_public_subnet_ids" {
   description = <<-EOT
-    ARN of the shared App Runner VPC connector ("platform-shared"). Get it with:
-      aws apprunner list-vpc-connectors \
-        --query "VpcConnectors[?VpcConnectorName=='platform-shared'].VpcConnectorArn" --output text
+    The shared platform's PUBLIC subnet IDs (≥2, in ≥2 AZs). ECS Express tasks
+    run here so Express provisions an internet-facing ALB. Get them with:
+      cd ~/Development/aws-platform/terraform && terraform output -json public_subnet_ids
+  EOT
+  type        = list(string)
+}
+
+variable "platform_ecs_security_group_id" {
+  description = <<-EOT
+    The shared `platform-ecs-egress` security group ID. RDS (platform-rds-sg)
+    trusts it, so Express tasks wearing this SG can reach the shared database.
+    Get it with:
+      cd ~/Development/aws-platform/terraform && terraform output -raw ecs_egress_sg_id
+    (If absent, apply the one-time platform prereq described in the deploy skill.)
   EOT
   type        = string
 }
@@ -49,19 +60,20 @@ variable "github_branch" {
 }
 
 # ---------------------------------------------------------------------------
-# App runtime sizing (App Runner)
+# App runtime sizing (Fargate task). Numeric CPU units / MiB of memory.
+# Valid CPU: 256, 512, 1024, 2048, 4096. Memory must be valid for the CPU.
 # ---------------------------------------------------------------------------
 
 variable "app_cpu" {
-  description = "App Runner CPU size (e.g. '0.25 vCPU', '0.5 vCPU', '1 vCPU')."
+  description = "Fargate task CPU units (e.g. '256', '512', '1024', '2048')."
   type        = string
-  default     = "1 vCPU"
+  default     = "1024"
 }
 
 variable "app_memory" {
-  description = "App Runner memory size (e.g. '0.5 GB', '1 GB', '2 GB')."
+  description = "Fargate task memory in MiB (e.g. '512', '1024', '2048')."
   type        = string
-  default     = "2 GB"
+  default     = "2048"
 }
 
 # ---------------------------------------------------------------------------
