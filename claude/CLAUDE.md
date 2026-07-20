@@ -327,6 +327,15 @@ Then restructure into the folder layout above.
 
 ---
 
+## Writing Style (copy, emails, docs, any prose)
+
+- **Never use em dashes** in anything written for humans: UI copy, marketing
+  copy, emails, documentation, README files, error messages, etc. Rewrite the
+  sentence instead: use a comma, colon, parentheses, or split it into two
+  sentences.
+
+---
+
 ## GitHub
 
 - **Always use SSH for GitHub remotes**, never HTTPS. SSH avoids OAuth scope issues (e.g., being unable to push commits that touch `.github/workflows/*` without the `workflow` scope).
