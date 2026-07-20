@@ -327,12 +327,87 @@ Then restructure into the folder layout above.
 
 ---
 
-## Writing Style (copy, emails, docs, any prose)
+## Writing & Copywriting Standards (copy, emails, docs, any prose)
+
+Every word shipped in an app, site, or email should sound like a sharp human
+wrote it. Sources: the direct-response canon (Ogilvy, Halbert's Boron Letters,
+Sugarman, Schwartz, Caples, Cashvertising) and modern practitioners (Harry Dry,
+Julian Shapiro, Joanna Wiebe, Hormozi, Sam Parr).
+
+### Never sound AI (hard rules)
 
 - **Never use em dashes** in anything written for humans: UI copy, marketing
   copy, emails, documentation, README files, error messages, etc. Rewrite the
   sentence instead: use a comma, colon, parentheses, or split it into two
   sentences.
+- **Banned words**: delve, elevate, seamless, effortless, unleash, unlock,
+  supercharge, empower, revolutionize, game-changer, cutting-edge, robust,
+  leverage (as a verb), streamline, harness, journey, dive in, landscape,
+  realm, tapestry, "in today's fast-paced world".
+- **Banned constructions**: "It's not just X, it's Y", "Whether you're A or B",
+  "Look no further", rhetorical-question openers, three-item parallel triads in
+  every paragraph, exclamation-mark enthusiasm, generic intros and wrap-up
+  conclusions.
+- **The read-aloud test**: if a sentence would sound odd said out loud to a
+  friend, rewrite it. Vary sentence length. Short beats long.
+
+### Voice (all writing)
+
+- Write like you talk, to ONE person, as "you". Never "users" or "customers"
+  in copy they will read.
+- Third-to-fifth grade reading level. Short words, short sentences, short
+  paragraphs. A great sentence is a good sentence made shorter.
+- Steal the customer's own words (reviews, support tickets, interviews) instead
+  of inventing marketing-speak. The best copy is assembled, not written.
+- Specifics beat superlatives: "Groceries in 1 hour" beats "Lightning-fast
+  delivery". Numbers, timeframes, and concrete nouns build trust.
+
+### The three tests (run on every headline and tagline)
+
+1. **Can you visualize it?** If the reader can't picture it, make it concrete.
+2. **Can you falsify it?** Provable claims beat vague praise.
+3. **Could anyone else say it?** If a competitor could paste it on their site,
+   it says nothing. Rewrite until only this product can claim it.
+
+### Marketing pages (landing pages, heroes, feature sections)
+
+- Formula: conversion = desire minus (labor + confusion). Every element either
+  raises desire or cuts effort/confusion, or it gets deleted.
+- **Header**: fully descriptive of what the product does. Test: reading only
+  this line, does a stranger know exactly what's being sold? Add a hook (bold
+  specific claim, or answer the biggest objection).
+- **Subheader**: one or two sentences on how it works or why the claim is
+  believable.
+- Bold claim at the top, then spend the rest of the page proving it: numbers,
+  screenshots of the real product, testimonials showing transformation.
+  Proof over promise.
+- Value prop exercise: what bad alternative do people use today, how is this
+  better, turn that into an action statement.
+- **Headlines are 80% of the work** (Ogilvy). Write 10 variants, keep the one
+  that passes the three tests. Match the copy to the reader's awareness stage
+  (Schwartz): unaware readers need the problem named; product-aware readers
+  need the differentiator.
+- **CTAs**: value over action. "Get my report" beats "Submit". Put the
+  objection-killer next to the button ("Free. No credit card.").
+
+### In-app microcopy (UX writing)
+
+- One message = one idea. One concept = one term, used identically everywhere.
+- **Buttons** are verbs that say exactly what happens next, and should complete
+  the sentence "I want to ___".
+- **Error messages**: say what happened and how to fix it, in plain words.
+  Never a bare "Something went wrong", never blame the user, never show raw
+  error codes without a human sentence first.
+- **Empty states, tooltips, placeholders**: short, helpful, zero jargon.
+  Front-load the key words; people skim.
+- Sound like a competent human helping a friend, not a system emitting output.
+
+### Emails
+
+- Subject line: curiosity plus specificity, under about 7 words.
+- Body reads like a note to one friend: short, plain, one clear ask.
+- Structure when persuading: problem, agitate, solve (PAS). Give a reason why
+  for every ask.
 
 ---
 
