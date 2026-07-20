@@ -62,15 +62,118 @@ Every application we build ships with this baseline — don't ask, just include 
 
 ## UI & Design Standards (every application)
 
+The goal is UI that looks like a designed product, not an AI template. The
+generic "AI look" — indigo→purple gradients, centered hero + three feature
+cards, emoji icons, uniform border-radius, Inter-everywhere with no hierarchy —
+is the statistical median of training data. Escape it by making explicit
+choices on typography, color, and motion at project start, then applying them
+consistently.
+
+### Baseline
+
 - **Look and feel**: intuitive, clean, and professional — but not boring.
-  Be creative; use tasteful animations and micro-interactions where they add
-  polish, never where they slow the user down.
 - **Zero-training usability**: someone who has never seen the app should be
   able to open it and understand what's going on. Prefer obvious labels, clear
   empty states, and visible affordances over cleverness.
 - **Info icons**: wherever something needs explanation — especially calculations,
   derived numbers, or non-obvious fields — add an info icon (tooltip/popover)
   that explains it in plain language.
+
+### UX psychology (apply everywhere)
+
+- **Aesthetic-usability effect**: users perceive attractive UIs as more usable
+  and forgive small flaws in them — visual polish is functional, not cosmetic.
+- **Hick's law**: fewer, simpler choices per screen. Use progressive disclosure —
+  hide advanced options until they're needed.
+- **Fitts's law**: primary actions are large and near the user's attention;
+  touch targets ≥ 44×44px on mobile.
+- **Doherty threshold**: acknowledge every interaction in < 400ms — optimistic
+  UI, instant pressed states, skeletons for anything slower.
+- **Cognitive load**: avoid clutter, match existing mental models, offload work
+  from the user (smart defaults, autofill, remembered state).
+- **Peak–end rule**: over-invest in the first-run experience and in success
+  moments (confirmations, completions) — those are what users remember.
+
+### Typography
+
+Choose fonts deliberately per project — never one default font for everything.
+
+- **App/dashboard UI**: Inter or Geist (screen-optimized, tall x-height,
+  legible at 13px). Use `tabular-nums` on any column of numbers.
+- **Headings/display**: pick ONE distinctive font per project for identity —
+  e.g. Bricolage Grotesque, Space Grotesk, Sora, Fraunces, Instrument Serif.
+  Pair fonts that contrast in style but share a similar x-height.
+- **Long-form reading**: a readable serif (Lora, Newsreader, Source Serif 4).
+- **Code/monospace data**: JetBrains Mono or Geist Mono.
+- Load via `next/font` (self-hosted, no layout shift); prefer variable fonts
+  (40–60% smaller payload). Mobile: system fonts or `expo-font` with the same picks.
+- **Scale & rhythm**: fixed type scale (e.g. 12/14/16/18/20/24/30/36/48);
+  body 14–16px, dense tables ≥ 12px; line-height ~1.5 body, 1.1–1.2 headings;
+  line length 45–75 characters; build hierarchy with weight and color, not
+  size alone.
+
+### Color
+
+- Define the palette at project start using **60-30-10**: ~60% neutral
+  surfaces, ~30% secondary, ~10% accent. The accent is what makes the UI feel
+  alive — spend it deliberately (primary buttons, active states, key data),
+  never everywhere.
+- Pick a real brand accent per project. **Banned**: the default indigo→purple
+  gradient (#6366F1→#A855F7) and generic blue-500-on-white template look.
+- Tint neutrals warm or cool — never flat pure grays; near-black text on
+  near-white (e.g. #0A0A0A on #FAFAFA), not #000 on #FFF.
+- Use **semantic tokens** (`background`, `surface`, `border`, `muted`,
+  `primary`, `success`, `warning`, `danger`) — components never hardcode hex.
+- Define colors in **OKLCH** where practical (Tailwind v4 native): perceptually
+  uniform lightness keeps generated shades consistent across hues.
+- **Dark mode is not inverted light mode**: elevation = lighter surfaces (≥ 4
+  surface levels), desaturated accents, minimal shadows, dark gray base — never
+  pure black.
+- Contrast: ≥ 4.5:1 body text, ≥ 3:1 large text and UI elements.
+
+### Motion & micro-interactions
+
+How things move matters more than that they move — easing quality is the
+difference between polished and cheap.
+
+- **Libraries**: web → Motion (framer-motion; MIT, small) as default; anime.js
+  for staggered/SVG/timeline flourishes on marketing pages; plain CSS
+  transitions for simple state changes; View Transitions API for page
+  transitions. Mobile → React Native Reanimated (+ Moti). Lottie for
+  illustrated animation. (GSAP is powerful but Webflow-owned with license
+  restrictions — default to Motion.)
+- **Durations**: 100–200ms micro-interactions (hover, press, toggle), 200–300ms
+  standard transitions (modals, dropdowns), 300–500ms large moves only.
+  Nothing over 500ms outside deliberate hero/onboarding moments. The more
+  frequent the action, the faster its animation.
+- **Easing**: ease-out (quart/expo) for entrances, ease-in or a fast fade for
+  exits, ease-in-out for on-screen moves, springs for gesture-driven mobile
+  motion. Linear only for loaders/tickers. No bounce or elastic in product UI.
+- Animate only `transform` and `opacity`; never animate layout properties.
+- **Purposeful only**: every animation must orient (where did this come from?),
+  give feedback (did that work?), or add personality in low-frequency moments.
+  Total animation wait per task under ~3 seconds.
+- The touches that make UIs feel alive: staggered list entrances (20–40ms/item),
+  count-up number transitions, pressed states on every button, subtle
+  hover lifts on cards.
+- Always respect `prefers-reduced-motion`.
+
+### Craft details (designed vs. generated)
+
+- **Empty states are first-class screens**: informative copy + supporting
+  visual + a prominent CTA to create the first item; hide filters/tabs that do
+  nothing until content exists.
+- **Loading**: skeletons that match the final layout (not spinners) for content;
+  optimistic updates for user actions; inline spinners for form submissions.
+- **Shadows**: layered and subtle (two low-opacity shadows, slight y-offset),
+  optionally tinted toward the surface hue — never one heavy black blur.
+- **Spacing**: fixed scale only (4/8/12/16/24/32/48/64px), no arbitrary values.
+  Start with generous whitespace and remove — roomy reads as quality.
+- **Icons**: one consistent set (Lucide by default; Phosphor for personality).
+  Never emoji as UI icons.
+- **Polish pass before "done"**: consistent radii, aligned optical edges,
+  visible focus states, hover states on everything interactive, and real
+  designed error/success states.
 
 ---
 
