@@ -60,6 +60,70 @@ Every application we build ships with this baseline — don't ask, just include 
 
 ---
 
+## Security Standards (every application)
+
+Pragmatic baseline, not enterprise theater. The goal is zero gaping holes:
+the OWASP top risks (broken access control, misconfiguration, injection)
+covered by default in every app.
+
+### Authentication & sessions
+
+- JWTs: short-lived access tokens (15-60 min) plus refresh token rotation.
+  Store tokens in `HttpOnly` + `Secure` + `SameSite=Lax` cookies, never in
+  localStorage.
+- Passwords hashed with bcrypt or argon2. Never plaintext, never reversible.
+- Login returns a generic "invalid email or password" (no user enumeration),
+  and login/signup/password endpoints are rate-limited (e.g. slowapi on
+  FastAPI).
+- The seed admin's `admin123!` default is for local dev only: in production
+  the seed reads its password from an env secret, and the app nags the admin
+  to change it if the default is still set.
+
+### Authorization (OWASP #1 risk)
+
+- EVERY API endpoint and server action re-checks authentication AND
+  authorization server-side. Middleware or UI hiding is never the only gate.
+- Object-level checks always: a user can only read/modify rows they own.
+  Never trust an ID from the client without verifying ownership (no IDOR).
+- RBAC enforced in the backend on every admin route, not just by hiding
+  admin UI.
+
+### Input & data handling
+
+- Validate every input at the boundary: Pydantic schemas on FastAPI, Zod on
+  Next.js API routes and server actions. Reject, don't sanitize-and-hope.
+- Database access only through the ORM or parameterized queries. Never
+  string-concatenate SQL.
+- Never render user content as raw HTML (`dangerouslySetInnerHTML` only for
+  trusted, sanitized content).
+- Errors to the client are human messages, never stack traces or internals.
+  No secrets, tokens, or PII in logs.
+
+### Secrets & config
+
+- Secrets live in env vars locally and AWS SSM/Secrets Manager in production.
+  Never committed; `.env*` is always gitignored.
+- Never prefix a secret with `NEXT_PUBLIC_` (it ships to the browser).
+- CORS locked to the app's known origins. Never `*` with credentials.
+- HTTPS everywhere (CloudFront/ALB already provide it); cookies get `Secure`.
+
+### Infra & dependencies
+
+- RDS is never publicly accessible; security groups are least-privilege.
+- Run `npm audit` / `pip-audit` before first deploys and when adding
+  dependencies; don't ship known-critical CVEs.
+- Set basic security headers: `X-Content-Type-Options: nosniff`,
+  `frame-ancestors` (or `X-Frame-Options: DENY`), and a CSP where practical.
+
+### Pre-ship gut check
+
+Before calling an app done, verify: Can an anonymous user reach any
+authenticated endpoint? Can user A read or modify user B's data by changing
+an ID? Is any secret in the client bundle or git history? Is login
+rate-limited? Do errors leak internals? All five must be "no".
+
+---
+
 ## UI & Design Standards (every application)
 
 The goal is UI that looks like a designed product, not an AI template. The
