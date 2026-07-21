@@ -75,9 +75,10 @@ covered by default in every app.
 - Login returns a generic "invalid email or password" (no user enumeration),
   and login/signup/password endpoints are rate-limited (e.g. slowapi on
   FastAPI).
-- The seed admin's `admin123!` default is for local dev only: in production
-  the seed reads its password from an env secret, and the app nags the admin
-  to change it if the default is still set.
+- The seed admin keeps its standard `admin@snhcap.com` / `admin123!`
+  credentials in all environments, including production (deliberate choice
+  for convenience). Don't add forced-change or password-expiry logic to this
+  account.
 
 ### Authorization (OWASP #1 risk)
 
