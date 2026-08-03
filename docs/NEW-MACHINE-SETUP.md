@@ -83,17 +83,60 @@ From this folder:
 ```
 
 (Or manually: copy `claude/CLAUDE.md` → `~/.claude/CLAUDE.md`,
-`claude/commands/` → `~/.claude/commands/`, `claude/skills/deploy/` →
-`~/.claude/skills/deploy/`, and make sure `create-db.sh` stays executable.)
+`claude/commands/` → `~/.claude/commands/`, `claude/skills/` →
+`~/.claude/skills/`, and make sure `create-db.sh` stays executable.)
 
 This gives every Claude Code session the SNH conventions (stack, folder
-structure, auth/RBAC baseline, UI standards) plus the `/setup` command and
-the `/deploy` skill.
+structure, auth/RBAC baseline, security standards, UI and design standards,
+the design workflow, the `/context` folder convention, data reporting
+standards, and writing rules) plus all the slash commands and skills.
+
+Verify the commands and skills landed:
+
+```bash
+ls ~/.claude/commands/ | wc -l     # expect ~23 .md files, not 1
+ls ~/.claude/skills/               # expect deploy, frontend-design, invoice-parser-gen
+```
+
+If `commands/` has only `setup.md`, you are running an old snapshot that
+predates 2026-08-03. The global CLAUDE.md references `/polish`, `/critique`,
+`/audit`, `/teach-impeccable` and others, and they will silently not exist.
+
+## 5b. Plugins (not installed by sync.sh)
+
+Some skills come from plugins rather than this repo, and `sync.sh` cannot
+install them:
+
+- **Org-managed plugins** (`snh-ledger`, `cme-corp-brand`,
+  `snh-ppt-formatter`, `anthropic-skills`, `cowork-plugin-management`) arrive
+  automatically once you log in to Claude Code with your SNH account. Nothing
+  to install by hand.
+- **Marketplace plugins** come from `anthropics/claude-plugins-official`,
+  registered under `~/.claude/plugins/`. Manage them from an interactive
+  `claude` session with `/plugin`.
+
+Verify the SNH brand kit is available, since the design workflow depends on it
+for SNH-branded projects:
+
+```bash
+claude
+# In the session, ask: "list the snh-ledger skills you have"
+# Expect: ledger-brand, ledger-deck, ledger-pdf, ledger-doc, ledger-chart, ledger-diagram
+```
+
+If they are missing, check that you are logged in with the SNH account
+(`/status` in an interactive session) before doing anything else. A project
+kicked off without them will invent its own brand instead of using The Ledger.
+
+> **Do not copy `~/.claude/settings.json` between machines.** It can contain
+> plaintext MCP server tokens. It is deliberately excluded from this snapshot.
+> Set up MCP servers fresh on each machine.
 
 ## 6. The shared deployment platform
 
-The platform (shared VPC + NAT + RDS Postgres + App Runner connector) should
-already exist in the AWS account — check:
+The platform (shared VPC, public + private subnets, NAT, RDS Postgres
+`platform-db`, and the shared `platform-ecs-egress` security group that ECS
+Express tasks wear) should already exist in the AWS account. Check:
 
 ```bash
 aws ec2 describe-vpcs --filters Name=tag:Name,Values=platform-vpc --query "Vpcs[0].VpcId"
@@ -111,15 +154,21 @@ aws ec2 describe-vpcs --filters Name=tag:Name,Values=platform-vpc --query "Vpcs[
   Route 53 zone for `apps.snhcap.com` and outputs its name servers
   (`terraform output apps_zone_name_servers`) — add those four values as NS
   records named `apps` in GoDaddy's DNS for snhcap.com. Without this, custom
-  domains won't validate and apps only get raw `*.awsapprunner.com` URLs
+  domains won't validate and apps only get the raw `*.on.aws` ECS Express URL
   (which Microsoft Defender flags as suspicious).
+
+  Read the cost table in `aws-platform/README.md` before standing up a new
+  account. The real figure is roughly $500/month at a dozen services, not the
+  ~$45 the older docs claimed.
 
 ## 7. Smoke test
 
 ```bash
 mkdir /tmp/cc-test && cd /tmp/cc-test && claude
-# In the session:  /setup        → should create .claude/ with project files
+# In the session:  /setup        → should create .claude/ AND a /context folder
+#                                  (context/README.md + inbox/ + knowledge/)
 # Conventions check: ask "what stack do we use?" → should answer from CLAUDE.md
+# Commands check:    type /pol   → /polish should autocomplete
 ```
 
 ---
@@ -129,7 +178,19 @@ mkdir /tmp/cc-test && cd /tmp/cc-test && claude
 | Thing | Location |
 |---|---|
 | Global conventions | `~/.claude/CLAUDE.md` |
-| `/setup` command | `~/.claude/commands/setup.md` |
-| `/deploy` skill + templates | `~/.claude/skills/deploy/` |
+| Slash commands (`/setup`, `/polish`, `/critique`, …) | `~/.claude/commands/` |
+| Skills (`deploy`, `frontend-design`, `invoice-parser-gen`) | `~/.claude/skills/` |
+| Plugins (org-managed + marketplace) | `~/.claude/plugins/` |
 | Shared platform Terraform | `~/Development/aws-platform/terraform/` |
 | Architecture explainer | `~/Development/aws-platform/ARCHITECTURE.md` |
+| Platform costs + state warning | `~/Development/aws-platform/README.md` |
+
+## Known gaps this doc cannot close
+
+- **Terraform state.** The platform's `terraform.tfstate` lives only on the
+  original operator's Mac and is not in version control. A new machine cannot
+  manage the existing platform stack without a copy of it. Get it from the
+  original machine before running `terraform apply` in
+  `~/Development/aws-platform`.
+- **MCP servers.** Configured per-machine in `~/.claude/settings.json`, which
+  is not snapshotted because it can hold plaintext tokens.

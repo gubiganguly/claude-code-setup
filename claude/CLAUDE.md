@@ -94,7 +94,8 @@ nearly empty, so there is always an obvious place for context to land.
 - **Shared platform**: small projects deploy in the skill's SHARED mode onto the
   standing platform stack at `~/Development/aws-platform` (shared VPC +
   `platform-db` RDS; ECS Express tasks run in the platform public subnets wearing
-  the `platform-ecs-egress` SG, sharing one ALB across services). Never
+  the `platform-ecs-egress` SG, behind a small pool of Express-managed ALBs that
+  are shared across services rather than one per project). Never
   `terraform destroy` the platform stack — all shared-mode databases live on it.
   Dedicated mode (own VPC+RDS, no NAT) is only for isolation-sensitive apps.
 

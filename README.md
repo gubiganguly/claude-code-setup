@@ -31,12 +31,20 @@ claude/
                              kickoff questions, mockup approval), the /context
                              folder convention, data reporting & analytics
                              standards, and writing/copywriting rules.
-  commands/setup.md          The /setup command — scaffolds a project's .claude
-                             folder (project CLAUDE.md + permission allowlist)
-                             and its /context folder.
+  commands/                  All 23 slash commands. /setup scaffolds a project's
+                             .claude folder + its /context folder; the rest are
+                             the design workflow (/polish, /critique, /audit,
+                             /teach-impeccable, /animate, …) and the invoice
+                             commands. The global CLAUDE.md references these by
+                             name, so a machine without them is broken.
   skills/deploy/             The /deploy skill + all its battle-tested templates
                              (Dockerfile, GitHub Actions workflow, Terraform for
                              both SHARED and DEDICATED modes).
+  skills/frontend-design/    Invoked for every new page or screen.
+  skills/invoice-parser-gen/ Builds per-vendor invoice parsers.
+
+  NOT here: ~/.claude/settings.json (can hold plaintext MCP tokens) and
+  ~/.claude/plugins/ (org-managed + marketplace, arrive on SNH login).
 
 aws-platform/
   ARCHITECTURE.md            Plain-English end-to-end explanation of the whole
