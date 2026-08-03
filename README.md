@@ -25,9 +25,15 @@ claude/
   CLAUDE.md                  Global conventions every Claude Code session loads:
                              stack (Next.js + FastAPI + Postgres), folder
                              structure, GitHub/SSH rules, auth/RBAC baseline
-                             (JWT, admin@snhcap.com seed admin), UI standards.
+                             (JWT, admin@snhcap.com seed admin), security
+                             standards, UI + design standards, the design
+                             workflow (per-project depth tier + SNH-brand
+                             kickoff questions, mockup approval), the /context
+                             folder convention, data reporting & analytics
+                             standards, and writing/copywriting rules.
   commands/setup.md          The /setup command — scaffolds a project's .claude
-                             folder (project CLAUDE.md + permission allowlist).
+                             folder (project CLAUDE.md + permission allowlist)
+                             and its /context folder.
   skills/deploy/             The /deploy skill + all its battle-tested templates
                              (Dockerfile, GitHub Actions workflow, Terraform for
                              both SHARED and DEDICATED modes).
@@ -78,4 +84,4 @@ This folder is a **copy**, not the live config. After meaningful changes to
 "./sync.sh" snapshot
 ```
 
-Snapshot last refreshed: 2026-06-23.
+Snapshot last refreshed: 2026-08-03.
