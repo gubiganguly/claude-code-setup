@@ -1,0 +1,25 @@
+# Deploy config. Holds account topology (bucket names, zone names, account ID).
+# Never commit. See config.env.example.
+.deploy.env
+config.env
+*.env.local
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# terraform.tfvars holds per-environment config. No secrets by design (values
+# go straight to Secrets Manager), but still not for git.
+terraform.tfvars
+*.auto.tfvars
+!terraform.tfvars.example
+
+# The bootstrap stack is the one stack with local state, by necessity. Keep its
+# state with the account's break-glass material, not in a public repo.
+terraform/bootstrap/bootstrap.tfstate*
+
+.DS_Store

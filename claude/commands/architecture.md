@@ -20,8 +20,8 @@ Parse the provided arguments:
 
 ### Check for Existing Architecture
 
-1. Check if `codebase-docs/architecture/` directory exists
-2. Check if `codebase-docs/architecture/architecture.md` exists
+1. Check if `docs/` directory exists
+2. Check if `docs/architecture.md` exists
 3. If the directory doesn't exist, create it
 
 ### Determine Update Strategy (CRITICAL for Token Efficiency)
@@ -110,7 +110,7 @@ When doing a full review, use the Explore agent or direct tools to thoroughly ex
 
 ### For Main Architecture (`architecture.md`)
 
-Write `codebase-docs/architecture/architecture.md` with this structure:
+Write `docs/architecture.md` with this structure:
 
 ```markdown
 # [Project Name] — Architecture Overview
@@ -206,7 +206,7 @@ Write `codebase-docs/architecture/architecture.md` with this structure:
 
 ### For Feature Architecture (`<feature-name>-architecture.md`)
 
-When FEATURE_NAME is provided, create `codebase-docs/architecture/<feature-name>-architecture.md`:
+When FEATURE_NAME is provided, create `docs/<feature-name>-architecture.md`:
 
 ```markdown
 # [Feature Name] — Detailed Architecture

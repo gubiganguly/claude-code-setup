@@ -6,9 +6,9 @@
 #
 #   * VPC (10.10.0.0/16) with public/private subnets + single NAT gateway
 #   * One RDS Postgres instance hosting a separate database per project
-#   * One shared App Runner VPC connector (reused by every project's service)
+#   * One shared egress SG (platform-ecs-egress) that platform-db trusts
 #
-# Per-project resources (ECR repo, App Runner service, secrets, OIDC role,
+# Per-project resources (ECR repo, ECS Express service, secrets, OIDC role,
 # database + user on the shared instance) live in each project's own
 # infra/terraform — NOT here.
 #
@@ -20,13 +20,29 @@
 ###############################################################################
 
 terraform {
-  required_version = ">= 1.6"
+  # 1.10 introduced native S3 state locking (use_lockfile), which the backend
+  # block below relies on.
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+  }
+
+  # Remote state. Migrated from a local terraform.tfstate on 2026-08-13.
+  # This state describes the VPC and the RDS instance that every project's
+  # database lives on, so losing it would mean losing the ability to manage
+  # any of them. Versioned + KMS-encrypted, with locking to stop two
+  # concurrent applies corrupting it.
+  backend "s3" {
+    bucket       = "snh-tfstate-346698404534"
+    key          = "platform/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    kms_key_id   = "arn:aws:kms:us-east-1:346698404534:key/a55890ab-75e6-4f3a-8262-ffadd5eed915"
+    use_lockfile = true
   }
 }
 

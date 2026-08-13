@@ -1,0 +1,21 @@
+{
+  "name": "aws-deploy-kit",
+  "version": "2.0.0",
+  "description": "Deploy containerized web apps to Amazon ECS Express Mode with Terraform and GitHub Actions. Remote-locked state, private RDS, optional branded domains, and no account details in any committed file.",
+  "author": {
+    "name": "SNH Capital Partners"
+  },
+  "homepage": "https://github.com/REPLACE_ME/aws-deploy-kit",
+  "keywords": [
+    "aws",
+    "ecs",
+    "fargate",
+    "terraform",
+    "deploy",
+    "cicd",
+    "github-actions"
+  ],
+  "skills": [
+    "./skills/deploy"
+  ]
+}

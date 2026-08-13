@@ -1,0 +1,55 @@
+###############################################################################
+# terraform.tfvars.example — copy to terraform.tfvars and fill in.
+#
+# terraform.tfvars is GITIGNORED. It holds no secrets by design (API keys are
+# written straight to Secrets Manager, never through Terraform), but it is
+# still per-environment config that does not belong in git.
+#
+# Account-level values (region, platform names, hosted zone) come from the
+# deploy config file — the /deploy skill fills them in for you.
+###############################################################################
+
+# --- Identity ---------------------------------------------------------------
+service_name = "my-app"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+# --- CI ---------------------------------------------------------------------
+github_owner  = "my-org"
+github_repo   = "my-app"
+github_branch = "main"
+
+# --- Domain -----------------------------------------------------------------
+# Leave custom_domain = "" for no domain (app served at its *.on.aws URL).
+# To use one, set BOTH lines. hosted_zone_name must be a Route 53 public zone
+# you control, and custom_domain must sit inside it.
+#
+#   custom_domain    = "my-app.apps.example.com"
+#   hosted_zone_name = "apps.example.com"
+custom_domain    = ""
+hosted_zone_name = ""
+
+# --- Sizing -----------------------------------------------------------------
+# Start here. Raise only when CloudWatch shows sustained CPU above ~50%.
+#   256/512   static-ish frontend
+#   512/1024  default; most internal tools never exceed this
+#   1024/2048 real traffic or heavy server-side work
+cpu       = "512"
+memory    = "1024"
+min_tasks = 1
+max_tasks = 10
+
+# --- Application ------------------------------------------------------------
+# Secret NAMES only. Values are set out-of-band after the first apply:
+#   aws secretsmanager put-secret-value --secret-id my-app/anthropic-api-key \
+#     --secret-string 'sk-ant-...'
+app_secret_names = []
+
+environment_variables = {}
+
+# Seed demo data on every boot. Leave false for anything with real users.
+run_seeds = false
+
+# 0 lets a destroyed project be redeployed immediately under the same name.
+# Use 7 or 30 for anything whose data matters.
+secret_recovery_window_days = 7

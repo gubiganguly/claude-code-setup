@@ -18,10 +18,10 @@ You are a technical writer creating a README that is **clear, scannable, and wel
 
 ### Read Architecture Docs (Primary Source)
 
-1. Check if `codebase-docs/architecture/architecture.md` exists
+1. Check if `docs/architecture.md` exists
    - If it exists, read it thoroughly — this is your **primary source of truth** for understanding the project
    - Extract: project purpose, tech stack, features, project structure, setup requirements, deployment info
-2. Check for any feature-specific architecture docs in `codebase-docs/architecture/`
+2. Check for any feature-specific architecture docs in `docs/`
    - Note their names — you'll reference them in the AI section
 
 ### Read Existing Files
@@ -149,7 +149,7 @@ Write `README.md` at the project root with the following structure. **Every sect
 ├── backend/           # FastAPI server
 │   ├── src/           # Source code
 │   └── requirements/  # Python dependencies
-└── codebase-docs/     # Architecture documentation
+└── docs/     # Architecture documentation
 ```
 
 [This should be a simplified, human-friendly version. Not exhaustive.]
@@ -162,7 +162,7 @@ Write `README.md` at the project root with the following structure. **Every sect
 
 [Mention any non-obvious architectural decisions briefly.]
 
-> For a deep dive into the architecture, see [`codebase-docs/architecture/architecture.md`](codebase-docs/architecture/architecture.md).
+> For a deep dive into the architecture, see [`docs/architecture.md`](docs/architecture.md).
 
 ## Contributing
 
@@ -182,7 +182,7 @@ Write `README.md` at the project root with the following structure. **Every sect
 
 ### Entry Point
 
-Read [`codebase-docs/architecture/architecture.md`](codebase-docs/architecture/architecture.md) first. It contains:
+Read [`docs/architecture.md`](docs/architecture.md) first. It contains:
 - Complete project structure with file-level annotations
 - Frontend and backend architecture details
 - Database schema and data flow
@@ -194,7 +194,7 @@ Read [`codebase-docs/architecture/architecture.md`](codebase-docs/architecture/a
 ### Feature-Specific Docs
 
 [List any feature architecture docs that exist, e.g.:]
-- [`auth-architecture.md`](codebase-docs/architecture/auth-architecture.md) — Authentication and authorization deep dive
+- [`auth-architecture.md`](docs/auth-architecture.md) — Authentication and authorization deep dive
 - ...
 
 [If no feature docs exist, omit this subsection.]

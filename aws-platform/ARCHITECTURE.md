@@ -5,11 +5,9 @@ in the chain actually does. Written for humans; the operational how-to lives in
 [README.md](README.md), and the deploy procedure is automated by the `/deploy`
 Claude Code skill.
 
-> **Runtime: Amazon ECS Express Mode (Fargate).** This replaced AWS App Runner
-> in June 2026, after AWS stopped accepting new App Runner customers. If you
-> find a doc that says App Runner, it predates the migration. The only App
-> Runner artifact still in the account is an unused VPC connector (see
-> [Known leftovers](#known-leftovers)).
+> **Runtime: Amazon ECS Express Mode (Fargate).** Every service in this account
+> runs on Express Mode. A doc describing any other runtime predates June 2026
+> and is stale.
 
 ---
 
@@ -162,17 +160,16 @@ with the code that expects it.
 
 ## Known leftovers
 
-Honest notes about things in the account that the architecture no longer needs.
-Neither is load-bearing; both are safe to remove when someone has time, and
-neither should be built on.
+Honest notes about things in the account the architecture no longer needs.
+Not load-bearing, and nothing new should be built on them.
 
-- **`platform-shared` App Runner VPC connector.** Still declared in
-  `terraform/rds.tf` and still ACTIVE in AWS, left over from the App Runner
-  era. No App Runner services exist anymore, so nothing uses it.
-- **The private subnets and NAT gateway.** Express tasks egress through the
-  internet gateway instead, so the NAT is no longer on the request path for
-  new deploys. It still carries real monthly cost, so it is worth confirming
-  what (if anything) still routes through it before assuming it can go.
+- **The private subnets and NAT gateway.** Almost every Express task runs in the
+  public subnets and egresses via the internet gateway. **One exception:**
+  `pricing-wizard-reporting-backend` sits in `platform-private-0` and routes
+  `0.0.0.0/0` through the NAT (~104 MB/week as of 2026-08-13). That single
+  placement is what keeps a ~$32/mo NAT gateway alive, and it also forces the
+  extra internal ALB (~$16/mo). Move that service to a public subnet and both
+  charges disappear. Do not delete the NAT before moving it.
 
 ---
 

@@ -31,17 +31,30 @@ claude/
                              kickoff questions, mockup approval), the /context
                              folder convention, data reporting & analytics
                              standards, and writing/copywriting rules.
+  aws-deploy.env.example     Template for ~/.claude/.aws-deploy.env, the
+                             gitignored file holding this account's ID, state
+                             bucket, hosted zone, and seed admin credentials.
+                             The real one is NEVER in this repo.
   commands/                  All 23 slash commands. /setup scaffolds a project's
-                             .claude folder + its /context folder; the rest are
-                             the design workflow (/polish, /critique, /audit,
-                             /teach-impeccable, /animate, …) and the invoice
-                             commands. The global CLAUDE.md references these by
-                             name, so a machine without them is broken.
-  skills/deploy/             The /deploy skill + all its battle-tested templates
-                             (Dockerfile, GitHub Actions workflow, Terraform for
-                             both SHARED and DEDICATED modes).
+                             context/ and docs/ folders plus its CLAUDE.md; the
+                             rest are the design workflow (/polish, /critique,
+                             /audit, /teach-impeccable, …), /architecture,
+                             /readme, and the invoice commands. The global
+                             CLAUDE.md references these by name, so a machine
+                             without them is broken.
+  skills/deploy/             The /deploy procedure. The terraform and templates
+                             it drives live in aws-deploy-kit/ (below).
+  skills/checkpoint/         Reconciles docs against the code, cleans up dead
+                             files, and writes HANDOFF.md for the next agent.
   skills/frontend-design/    Invoked for every new page or screen.
   skills/invoice-parser-gen/ Builds per-vendor invoice parsers.
+
+aws-deploy-kit/              The deployment machinery the /deploy skill drives.
+                             bootstrap (state bucket) + platform (VPC, RDS) +
+                             four terraform modules + two presets + templates
+                             + scripts. Portable: all account-specific values
+                             come from the config file, so this directory can
+                             be handed to another company as-is.
 
   NOT here: ~/.claude/settings.json (can hold plaintext MCP tokens) and
   ~/.claude/plugins/ (org-managed + marketplace, arrive on SNH login).
@@ -60,8 +73,6 @@ docs/
   NEW-MACHINE-SETUP.md       Step-by-step: Homebrew tools, AWS CLI auth,
                              GitHub CLI + SSH keys, Claude Code install,
                              platform check, smoke test.
-  AWS-AppRunner-Deployment-Playbook.md
-                             The original deep-dive playbook (dedicated mode).
 
 sync.sh                      ./sync.sh snapshot  — refresh this folder from the
                                                    live config after changes
@@ -71,17 +82,20 @@ sync.sh                      ./sync.sh snapshot  — refresh this folder from th
 
 ## The one-paragraph version of how everything works
 
-Code is written locally (Next.js frontend, FastAPI backend, Homebrew Postgres),
-pushed to GitHub over SSH, where GitHub Actions builds a Docker image, pushes
-it to ECR, and rolls the project's Amazon ECS Express Mode (Fargate) service —
-migrations run on boot, health checks gate the traffic switch, so a broken
-build never goes live.
-Data lives on a shared RDS Postgres instance (`platform-db`, one isolated
-database per project) inside a shared VPC — fixed ~$45/mo for the platform,
-~$5/mo per deployed project. Each app gets a branded domain
-(`<project>.apps.snhcap.com`, Route 53 zone delegated from GoDaddy) with an
-auto-issued certificate. First deploy of a project is one `terraform apply`
-(the `/deploy` skill does it); every deploy after is `git push`.
+Code is written locally (Next.js frontend, FastAPI backend, Homebrew Postgres)
+and pushed to GitHub over SSH. GitHub Actions builds a Docker image, pushes it
+to ECR, runs database migrations as a one-shot task, and only then rolls the
+project's Amazon ECS Express Mode (Fargate) service. A failed migration stops
+the deploy and leaves the running version serving traffic.
+
+Data lives on a shared RDS Postgres instance (one isolated database per
+project) inside a shared VPC. Terraform state is remote, locked, and encrypted.
+Each app optionally gets a branded domain via CloudFront; the `/deploy` skill
+asks whether you want one rather than assuming.
+
+Cost is roughly $13/mo fixed for the platform database plus about $20/mo per
+deployed project. First deploy is one bootstrap script and one `terraform
+apply`; every deploy after is `git push`.
 
 ## Keeping this snapshot fresh
 
@@ -92,4 +106,4 @@ This folder is a **copy**, not the live config. After meaningful changes to
 "./sync.sh" snapshot
 ```
 
-Snapshot last refreshed: 2026-08-03.
+Snapshot last refreshed: 2026-08-13.

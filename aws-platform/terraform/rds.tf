@@ -5,7 +5,7 @@
 #
 # Design decisions:
 #   * Lives in the PUBLIC subnets with publicly_accessible = true, but the SG
-#     only admits the App Runner egress SG and the operator's admin_cidrs.
+#     only admits the ECS Express task egress SG and the operator's admin_cidrs.
 #     This is what lets /deploy create databases and run migrations straight
 #     from the laptop — no bastion. Inside the VPC the endpoint hostname still
 #     resolves to the private IP, so app traffic never leaves the VPC.
@@ -57,21 +57,5 @@ resource "aws_db_instance" "main" {
 
   tags = {
     Name = "platform-db"
-  }
-}
-
-# ---------------------------------------------------------------------------
-# Shared App Runner VPC connector — one connector, reused by every project's
-# App Runner service (pass its ARN to the project's terraform). Sits on the
-# private subnets so services get NAT egress + private-IP path to RDS.
-# ---------------------------------------------------------------------------
-
-resource "aws_apprunner_vpc_connector" "shared" {
-  vpc_connector_name = "platform-shared"
-  subnets            = aws_subnet.private[*].id
-  security_groups    = [aws_security_group.app_runner_egress.id]
-
-  tags = {
-    Name = "platform-shared"
   }
 }

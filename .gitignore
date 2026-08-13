@@ -1,9 +1,21 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Terraform
 *.tfstate
 *.tfstate.*
 .terraform/
 terraform.tfvars
+
+# Environment and config files.
+# ".env" alone does NOT match ".aws-deploy.env" or "config.env", and the deploy
+# config file holds the AWS account ID and the seed admin password. Match every
+# shape of it explicitly.
 .env
-.env.local
+.env.*
+*.env
+config.env
+.aws-deploy.env
+!*.env.example
+!config.env.example

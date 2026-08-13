@@ -5,12 +5,14 @@
 #   10.10.0.0/16    VPC
 #     10.10.1.0/24  public  AZ a   (NAT, RDS)
 #     10.10.2.0/24  public  AZ b   (RDS)
-#     10.10.11.0/24 private AZ a   (App Runner VPC connector ENIs)
+#     10.10.11.0/24 private AZ a   (pricing-wizard-reporting-backend only)
 #     10.10.12.0/24 private AZ b
 #
-# Private subnets route 0.0.0.0/0 through the single NAT — that's what gives
-# every project's App Runner service outbound internet (external APIs) while
-# keeping its ENIs unaddressable from outside.
+# Private subnets route 0.0.0.0/0 through the single NAT. Nearly every Express
+# task runs in the PUBLIC subnets with direct IGW egress; the one exception is
+# pricing-wizard-reporting-backend. That single service is why the ~$32/mo NAT
+# still exists, and why there is a second, internal ALB (~$16/mo). Move it to a
+# public subnet and both go away. Do NOT remove the NAT before moving it.
 ###############################################################################
 
 locals {
@@ -134,26 +136,6 @@ resource "aws_route_table_association" "private" {
 # Security groups
 # ---------------------------------------------------------------------------
 
-# Source SG for ALL projects' App Runner VPC connectors. No ingress — App
-# Runner is always the client.
-resource "aws_security_group" "app_runner_egress" {
-  name        = "platform-app-runner-egress"
-  description = "Shared egress SG for App Runner VPC connector"
-  vpc_id      = aws_vpc.main.id
-
-  egress {
-    description = "All egress (NAT covers internet, RDS SG covers DB)"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "platform-app-runner-egress"
-  }
-}
-
 # Source SG for ALL projects' ECS Express Mode tasks. No ingress — Express
 # manages ALB→task ingress on its own service SG; this SG is what RDS trusts.
 resource "aws_security_group" "ecs_egress" {
@@ -174,22 +156,18 @@ resource "aws_security_group" "ecs_egress" {
   }
 }
 
-# Shared RDS SG: Postgres from App Runner services (via the egress SG) and
+# Shared RDS SG: Postgres from ECS Express tasks (via the egress SG) and
 # from the operator's IP (admin_cidrs) so /deploy can create per-project
 # databases and run migrations from the laptop. Update admin_cidrs in
 # terraform.tfvars + re-apply when your IP changes.
 resource "aws_security_group" "rds_sg" {
-  name        = "platform-rds-sg"
+  name = "platform-rds-sg"
+  # NOTE: description is ForceNew in the AWS provider and this SG is attached to
+  # the load-bearing platform-db. Left at its original wording deliberately —
+  # changing it would replace the SG and bounce RDS. Reads "App Runner" for
+  # historical reasons only; the real trust is the ECS Express egress SG below.
   description = "Postgres access from App Runner + operator IPs"
   vpc_id      = aws_vpc.main.id
-
-  ingress {
-    description     = "Postgres from App Runner VPC connector"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app_runner_egress.id]
-  }
 
   ingress {
     description     = "Postgres from ECS Express tasks"

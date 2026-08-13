@@ -12,7 +12,9 @@ Projects use a split at the repo root based on what they include:
 /frontend                      # Next.js web app (TypeScript)
 /backend                       # Python backend (FastAPI)
 /mobile                        # React Native mobile app (Expo + TypeScript)
-/context                       # Shared human + Claude context (ALWAYS — see below)
+/context                       # Business knowledge (ALWAYS — see next section)
+/docs                          # Docs about this code (when there are any)
+README.md  HANDOFF.md  CLAUDE.md
 ```
 
 Not every project has all three code folders. Only include sections relevant
@@ -21,33 +23,63 @@ data reporting or anything else.
 
 ---
 
-## Context Folder (`/context`) — every project, no exceptions
+## Project Documentation — where things go
 
-Every project gets a `/context` folder at the repo root. It is the shared
-memory of the project: the user drops in raw human context, and Claude writes
-back the durable knowledge it derives. Create it on day one, even if it starts
-nearly empty, so there is always an obvious place for context to land.
+**One question decides everything: who is this for?**
+
+| Who it's for | Where it goes |
+|---|---|
+| A human arriving at the repo | `README.md` |
+| An AI agent picking the work up cold | `HANDOFF.md` |
+| Rules for how to work in this repo | `CLAUDE.md` |
+| Knowledge that outlives the code | `context/` |
+| Everything else written down | `docs/` |
+
+Five homes, no overlap. If a doc could go in two places, it belongs in the one
+matching its **reader**, not its topic.
 
 ```
-/context
-  README.md                    # What lives here + index of the files below
-  /inbox                       # USER DROP ZONE — raw, unedited, any format
-    meeting-notes-*.md         # Meeting notes, call summaries
-    transcript-*.txt           # Call/interview transcripts
-    email-*.md                 # Forwarded email threads
-    *.pdf, *.xlsx, *.csv       # Source docs, exports, screenshots
-  /knowledge                   # CLAUDE-MAINTAINED — derived, curated, durable
-    business-glossary.md       # Business terms defined in plain language
-    kpi-definitions.md         # Every KPI: formula, source, owner, caveats
-    decisions.md               # Decision log: what was decided, when, why
-    open-questions.md          # Unknowns blocking work + who can answer
-    findings.md                # Running log of discoveries and insights
-  /data-model                  # Only for projects with a database (see below)
-    schema-notes.md            # Tables, grain, joins, gotchas
-    source-of-truth.md         # Which table/field is authoritative for what
+README.md          Humans. What it is, how to run it. Front door. → /readme
+HANDOFF.md         AI agents. Current state, traps, how to add a feature. → /checkpoint
+CLAUDE.md          Rules for this repo. Layers on top of the global file.
+
+/context           Knowledge that survives the code being rewritten
+  README.md          Index of what's in here
+  /inbox             USER DROP ZONE — raw, unedited, any format
+  /knowledge         CLAUDE-MAINTAINED — derived, curated, durable
+    business-glossary.md   Business terms in plain language
+    kpi-definitions.md     Every KPI: formula, source, owner, caveats
+    decisions.md           What was decided, when, why
+    open-questions.md      Unknowns blocking work + who can answer
+    findings.md            Running log of discoveries
+  /data-model        Database projects only
+    schema-notes.md        Tables, grain, joins, gotchas
+    source-of-truth.md     Which table/field is authoritative for what
+
+/docs              Everything else: specs, guides, runbooks, design notes
+  architecture.md    How the code is structured → /architecture
+  <topic>.md         One file per topic. Add an index once past ~10 files.
 ```
 
-### How it works
+**The `context` vs `docs` line:** `context/` is knowledge about the *business
+and the problem*, which stays true even if you rewrite the app. `docs/` is
+knowledge about *this code*, which dies with it. A glossary of client billing
+terms is context. A guide to the payment module is docs.
+
+**Keeping it honest:** run `/checkpoint` when wrapping up or pausing a project.
+It re-reads the code, checks every doc claim against what the code actually
+does, proposes deleting what has gone dead, and refreshes `HANDOFF.md`. Docs
+that are never reconciled become confidently wrong, which is worse than absent.
+
+Not every project needs all of it. `README.md` and `HANDOFF.md` are always
+worth having. `context/` exists in every project, even if nearly empty, so
+there is always an obvious place for context to land. `docs/` appears when
+there is something to put in it.
+
+> Older projects may have a stray `codebase-docs/` folder from a previous
+> convention. Fold it into `docs/`; `/checkpoint` does this automatically.
+
+### How `/context` works
 
 - **`/inbox` belongs to the user.** They drop things in raw and never have to
   format, rename, or summarize first. Claude reads from it, never rewrites or
@@ -71,7 +103,43 @@ nearly empty, so there is always an obvious place for context to land.
   their existence in the README instead of committing them. Definitions and
   findings themselves are safe to commit and belong in version control.
 
----
+### File context from chat automatically
+
+**When the user pastes or describes something in chat that has durable value,
+write it to `/context` without being asked.** Context that stays in a chat
+transcript is lost the moment the session ends, and re-deriving it later is the
+single most wasteful thing that happens across sessions.
+
+**File it when it is:** meeting notes, a call transcript, a forwarded email
+thread, a spec or requirements list, a business rule, a definition, a decision
+and its rationale, a constraint, a deadline, a named stakeholder and their role,
+a data quirk, or an answer to something in `open-questions.md`.
+
+**Do not file:** debugging chatter, code snippets being worked on, one-off
+questions, anything already in the repo, or restatements of what is already in
+`knowledge/`.
+
+**Where it goes:**
+
+| What the user gave you | Where it lands |
+|---|---|
+| Raw material pasted verbatim (notes, transcript, email) | `context/inbox/from-chat-YYYY-MM-DD-<topic>.md` |
+| A definition or business term | `context/knowledge/business-glossary.md` |
+| A metric and how it is computed | `context/knowledge/kpi-definitions.md` |
+| A decision, with its reason | `context/knowledge/decisions.md` |
+| A question only a human can settle | `context/knowledge/open-questions.md` |
+| Something learned or measured | `context/knowledge/findings.md` |
+| A schema or data quirk | `context/data-model/` |
+
+Raw material keeps its original wording in `inbox/` (you may ADD files there,
+never edit or delete what the user put there). Anything you derive from it goes
+in `knowledge/`, sourced and dated, marked **confirmed** or **assumed**.
+
+**Then say so in one line:** "Filed that under `context/knowledge/decisions.md`
+as D6." Never silently, never a paragraph about it.
+
+If the project has no `context/` folder yet, create it (or run `/setup`) rather
+than dropping the context on the floor.
 
 ## Tech Stack & Deployment Standards
 
@@ -79,25 +147,53 @@ nearly empty, so there is always an obvious place for context to land.
 - **Backend**: Python FastAPI
 - **Database**: PostgreSQL — always. Locally via Homebrew Postgres; in production
   via AWS RDS PostgreSQL. Don't introduce other databases without asking.
-- **Hosting**: AWS (account 346698404534, default region `us-east-1`), Amazon ECS
-  Express Mode (Fargate) for containers, RDS for the database, Terraform for infra,
-  GitHub Actions + OIDC for CI/CD. (App Runner is deprecated — AWS stopped accepting
-  new customers on 2026-04-30; existing App Runner services keep running, but all
-  new deploys go to ECS Express Mode.)
-- **Deploying**: use the `/deploy` skill. First deploy = `terraform apply`; every
-  deploy after = `git push`. Never hand-roll AWS infra outside that pattern.
-- **Domains**: every deployed app gets `<project>.apps.snhcap.com`, served by
-  CloudFront in front of the ECS Express service (Route 53 zone owned by the
-  platform stack, delegated from GoDaddy; ACM cert auto-issued/renewed). Always
-  share and report the branded URL — never the raw `*.on.aws` Express URL, which
-  Microsoft Defender flags as suspicious.
-- **Shared platform**: small projects deploy in the skill's SHARED mode onto the
-  standing platform stack at `~/Development/aws-platform` (shared VPC +
-  `platform-db` RDS; ECS Express tasks run in the platform public subnets wearing
-  the `platform-ecs-egress` SG, behind a small pool of Express-managed ALBs that
-  are shared across services rather than one per project). Never
-  `terraform destroy` the platform stack — all shared-mode databases live on it.
-  Dedicated mode (own VPC+RDS, no NAT) is only for isolation-sensitive apps.
+- **Hosting**: AWS, Amazon ECS Express Mode (Fargate) for containers, RDS for the
+  database, Terraform for infra, GitHub Actions + OIDC for CI/CD.
+- **Deploying**: use the `/deploy` skill, which drives the **AWS Deploy Kit** at
+  `$DEPLOY_KIT_DIR` (see config file below). First deploy = one bootstrap script
+  plus one `terraform apply`; every deploy after = `git push`. Never hand-roll
+  AWS infra outside that pattern.
+- **Terraform state is always remote.** Every stack uses the S3 backend with
+  locking and KMS encryption. Never create a stack with local state: it cannot be
+  shared or locked, and it stores generated passwords in cleartext on disk.
+- **Secrets never pass through Terraform.** Terraform creates the secret
+  container; the value is written with `aws secretsmanager put-secret-value`.
+  Anything supplied as a Terraform variable ends up in state in plaintext.
+- **Domains**: apps get a branded domain served by CloudFront in front of the ECS
+  Express service. The skill ASKS whether a new project should have one and what
+  it should be — it never assumes. Always share the branded URL, never the raw
+  `*.on.aws` Express URL, which Microsoft Defender flags as suspicious.
+- **Shared platform**: projects deploy onto the standing shared platform (one VPC,
+  one RDS instance with a database per project, one ECS cluster). Never
+  `terraform destroy` the platform stack — every project's database lives on it.
+  A dedicated VPC and RDS costs roughly $30/mo extra before the app runs at all,
+  so use it only when isolation is genuinely required.
+- **Sizing**: default new services to 512 CPU / 1024 MiB. Raise only on measured
+  CloudWatch CPU, never on instinct.
+
+### Account-specific values live in a config file, never in this file
+
+**Never write an AWS account ID, S3 bucket name, hosted zone, internal domain,
+RDS endpoint, or resource ARN into CLAUDE.md, a README, or any committed file.**
+They belong in one gitignored config file:
+
+```
+~/.claude/.aws-deploy.env          (mode 600)
+```
+
+Read it when you need those values:
+
+```bash
+. "$DEPLOY_KIT_DIR/scripts/load-config.sh"    # or: set -a; . ~/.claude/.aws-deploy.env; set +a
+```
+
+It provides `AWS_REGION`, `AWS_ACCOUNT_ID`, `TF_STATE_BUCKET`, `HOSTED_ZONE_NAME`,
+`PLATFORM_*`, and the defaults for new projects. If a value you need is missing,
+ask the user and offer to add it there — do not hardcode it, and do not echo the
+file's contents into chat or into a commit.
+
+This is what lets the same skill and the same templates be handed to a portco
+running in their own AWS account without a find-and-replace.
 
 ---
 
@@ -106,9 +202,11 @@ nearly empty, so there is always an obvious place for context to land.
 Every application we build ships with this baseline — don't ask, just include it:
 
 - **Auth**: JWT-based authentication.
-- **Seed admin**: the first user is always `admin@snhcap.com` / `admin123!`,
-  created by an idempotent seed. This account must ALWAYS have the admin role —
-  never allow it to be demoted or deleted.
+- **Seed admin**: every app is seeded with one admin user by an idempotent seed.
+  The email and password come from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` in
+  `~/.claude/.aws-deploy.env` — never hardcode them here or in a committed seed
+  file; read them from env at seed time. This account must ALWAYS have the admin
+  role: never allow it to be demoted or deleted.
 - **Password change**: every app includes an easy, discoverable change-password
   flow (e.g. in account/settings).
 - **RBAC**: role-based access control in every app, with admin UI to add/remove
@@ -131,9 +229,9 @@ covered by default in every app.
 - Login returns a generic "invalid email or password" (no user enumeration),
   and login/signup/password endpoints are rate-limited (e.g. slowapi on
   FastAPI).
-- The seed admin keeps its standard `admin@snhcap.com` / `admin123!`
-  credentials in all environments, including production (deliberate choice
-  for convenience). Don't add forced-change or password-expiry logic to this
+- The seed admin keeps its standard credentials (from the config file, see
+  Tech Stack) in all environments, including production — a deliberate choice
+  for convenience. Don't add forced-change or password-expiry logic to this
   account.
 
 ### Authorization (OWASP #1 risk)
@@ -181,14 +279,189 @@ rate-limited? Do errors leak internals? All five must be "no".
 
 ---
 
+## The AI Tells — never ship these (UI, copy, email, and code)
+
+Everything in this section is the statistical median of training data. A model
+reaches for these when nothing told it to decide. None of them are bad in
+isolation; they are bad because they are what everything else already looks
+like, and people now recognize them on sight. Making a real choice instead is
+the entire job.
+
+**The test, run on every deliverable before calling it done**: if someone said
+"AI made this", would I have an argument? If not, redo it.
+
+Two rules that make the rest work:
+- **A tell is only a tell when it's the default.** Any single item here can be
+  the right call if it was chosen for a reason. Reaching for it because it came
+  first is the failure.
+- **Escaping one reflex into another is not escaping.** Cream backgrounds and
+  brutalist borders are now their own defaults. Decide, don't swap.
+
+### Visual tells
+
+**Fonts**
+- **Never default to Inter** (~47% of AI output), Roboto, or Poppins. Inter and
+  Geist remain allowed for dense app/dashboard body UI per the Typography
+  section below, but never as the display face and never as the only font.
+- The giveaway font set is **Inter + Space Grotesk + Instrument Serif + Geist**.
+  Using two of them together is itself a tell. Reach instead for Satoshi,
+  General Sans, Söhne, Untitled Sans, Fraunces, Redaction, or Bricolage
+  Grotesque.
+- **One word of the hero headline in italic serif** while the rest is sans.
+  This read as taste for about six months. It is now the universal AI startup
+  hero.
+- **Oversized italic serif as the display headline.** Set it roman, or pick a
+  non-serif display face.
+- One font for headings, body, labels, and buttons.
+- Only weights 400 and 700. Use the 300–800 range and build hierarchy with it.
+- All-caps body text, and tracked-uppercase "eyebrow" labels above headings.
+
+**Color**
+- **Banned outright**: the indigo→purple gradient (`#6366F1`→`#A855F7`),
+  lavender "vibecode purple" accents, Tailwind `blue-600` (`#2563EB`) as
+  primary, `violet-500` as the reflex accent, and blue→purple gradients in any
+  form (41% of AI sites that use a gradient use this one).
+- **Gradient text** on headings or metrics. Solid color only.
+- **`text-black` on `bg-white`** with a zero-saturation gray scale. Tint
+  neutrals 3–5% toward the primary hue.
+- **Dark mode with glowing colored box-shadows**, neon-on-dark, radial gradient
+  halos, and saturated spotlight haze behind sections.
+- Low-contrast gray body text on dark, which is how nearly every AI dark theme
+  fails WCAG AA. The contrast numbers in the Color section are hard gates.
+
+**Layout**
+- **The centered hero**: big heading, subtitle paragraph, one or two buttons,
+  dead center. The most predictable opening on the web. Use a split or
+  off-center composition.
+- **A badge or pill chip directly above the H1.** Delete it or fold it into the
+  headline.
+- **`grid-cols-3` for everything** (features, pricing, testimonials) and `1fr
+  1fr` equal halves. Use asymmetric splits (`2fr 1fr`, 60/40).
+- **The hero → features → pricing → FAQ → CTA page order.** Reorder it.
+- **Identical feature cards**: icon on top, title, one vague line, same size,
+  radius, and padding. If one feature matters more, make its card bigger.
+- **A colored 3–4px left border on cards.** The research calls this "almost as
+  reliable as em-dashes" for detecting AI. Never use it.
+- **The stats banner row** ("10K+ Users", "99.9% Uptime") and the hero metric
+  template (big number, small label, three across, gradient accent).
+- **Numbered 1-2-3 step sections**, and tiny numbers beside headings.
+- **Nested cards**, uniform `max-w-7xl`, and `py-20` on every section.
+- One border radius everywhere, especially `rounded-2xl` on all cards and
+  `rounded-full` on all buttons. Vary radius by element role.
+- Glassmorphism and `backdrop-blur` sticky nav used as decoration.
+- A 1px hairline border *plus* a wide diffuse shadow. Commit to a defined edge
+  or to soft elevation, not both.
+
+**Components & imagery**
+- **The terminal mockup with three red/yellow/green dots** (61% of AI-built
+  developer-tool sites). Use a real screenshot or a plain code block.
+- **Fake dashboard preview cards** with invented numbers ("Total Revenue:
+  $12,345"). Show the real product or show nothing.
+- **A grayscale "Trusted by" logo bar**, especially with placeholder logos.
+- **Emoji as nav or feature icons**, and the single huge rounded-square icon
+  tile centered above a heading.
+- Hand-drawn or shape-assembled SVG illustrations, and generic mascot blobs.
+- **"Built with ❤️"** footers.
+
+**Motion**
+- **The same fade-up on every element**, `duration-300` on everything,
+  `ease-in-out` as the only curve, and linear 0/100/200/300ms stagger.
+- Hover states that do nothing, and buttons that snap with no `:active` state.
+- `transition-all`. Target specific properties.
+- Decorative pulsing status dots, fake blinking cursors, "New" badges with
+  `animate-pulse`, and auto-scrolling marquees.
+
+### Writing tells
+
+The em-dash ban and banned-word list in the Writing standards section are the
+baseline. These are the rest, and they matter more, because they survive a
+find-and-replace.
+
+**Add to the banned word list**: testament, underscore (as a verb), pivotal,
+multifaceted, intricate, meticulous, foster, showcase, world-class,
+enterprise-grade, "at scale", "lightning fast".
+
+**The current tells** — newer than the classic list, and now the strongest
+signal, because everyone already scrubbed "delve":
+- **"Quietly"** — "quietly building", "quietly dominating", "quietly
+  transforming". Adds no information and points straight at a model.
+- **"Real" as an intensifier** — "real growth", "the real reason", "real
+  value", "real impact". Emphasis the sentence hasn't earned.
+- **"Earn"** — "earn the right to", "earn trust", "earn attention".
+- **Meta-narration** — "Here's the part most people miss", "Here's the
+  breakdown", "Let me state this as clearly as possible", "But here's the
+  thing". Never announce the structure. Just write it.
+
+**Cadence and shape.** This is what gives writing away after the words are
+fixed:
+- **The manufactured-contrast aphorism** used as a section closer: "It's not X.
+  It's Y." "That's not a feature. That's a promise." One is a tic. Several is a
+  signature.
+- **Dismissing something as "theater"** ("security theater", "productivity
+  theater"). Say what the thing does or fails to do.
+- **Perfectly balanced structure**: every paragraph the same length, every list
+  exactly three items, every section closing on a tidy summary sentence. Let a
+  list have two items, or seven.
+- **Relentless hedging** ("can help to", "may potentially", "often tends to")
+  paired with **zero first person**. Take a position.
+- Restating the prompt in the first sentence, and a closing paragraph that adds
+  nothing ("In summary, …").
+
+**CTA and UI copy**: "Get Started" (38% of AI sites), "Start Free Trial", "Try
+for Free". Name the actual action: "Scan your site", "See your score", "Run the
+first audit".
+
+### Email tells
+
+Email is where this matters most, because the reader knows you.
+
+- **Never open with** "I hope this email finds you well", "I hope you're doing
+  well", or "I wanted to reach out". Open with the reason you're writing.
+- **Never close with** "Please don't hesitate to reach out", "Looking forward
+  to hearing your thoughts", or "Thanks in advance".
+- **No headers, bold labels, or bullets in a short email.** A note to one person
+  is prose. Bulleting something that could have been three sentences is the
+  loudest tell there is.
+- Don't restate what they asked before answering it.
+- **Vary sentence length hard.** Real people put a nine-word sentence next to a
+  thirty-word one, and sometimes a fragment.
+- Contractions always. "Don't", "we'll", "it's".
+- One ask per email, stated plainly, with the reason attached.
+- **Match the thread.** If they wrote three lines with no greeting, don't reply
+  with four paragraphs and a salutation.
+- Sign off like a person ("Thanks," / "Best," / nothing), never "Warm regards".
+
+### Code tells
+
+Vibe-coded output has its own smell, independent of whether it runs.
+
+- **A comment on every line.** Comments narrating what the next line does are a
+  substitute for confidence, not documentation. Comment *why*, and only where
+  the reason isn't already in the code.
+- **`try`/`except` around everything**, including code that cannot throw. Catch
+  what you can actually handle.
+- **Custom error classes and a logging setup for a script that runs once.**
+  Match the ceremony to the lifespan of the code.
+- **The same guard repeated** — `if (arr && arr.length > 0)` three times in one
+  function. Check once, at the boundary.
+- Defensive null checks on values the type system already guarantees.
+- Tutorial voice: needless intermediate variables, step-by-step narration,
+  `console.log("Step 1: ...")`.
+- `div` soup with no semantic elements, no `:focus-visible`, no `aria-label` on
+  icon buttons, no skip link. Required elsewhere in this file; listed here
+  because AI omits them by default.
+- Hardcoded hex values instead of the semantic tokens required below.
+- Rewriting a whole file when three lines changed.
+
+---
+
 ## UI & Design Standards (every application)
 
 The goal is UI that looks like a designed product, not an AI template. The
-generic "AI look" — indigo→purple gradients, centered hero + three feature
-cards, emoji icons, uniform border-radius, Inter-everywhere with no hierarchy —
-is the statistical median of training data. Escape it by making explicit
-choices on typography, color, and motion at project start, then applying them
-consistently.
+generic "AI look" is catalogued in **The AI Tells** above; treat that section as
+the banned list and this one as the positive standard. Escape the median by
+making explicit choices on typography, color, and motion at project start, then
+applying them consistently.
 
 ### Baseline
 
@@ -222,8 +495,11 @@ Choose fonts deliberately per project — never one default font for everything.
 - **App/dashboard UI**: Inter or Geist (screen-optimized, tall x-height,
   legible at 13px). Use `tabular-nums` on any column of numbers.
 - **Headings/display**: pick ONE distinctive font per project for identity —
-  e.g. Bricolage Grotesque, Space Grotesk, Sora, Fraunces, Instrument Serif.
-  Pair fonts that contrast in style but share a similar x-height.
+  e.g. Satoshi, General Sans, Söhne, Untitled Sans, Bricolage Grotesque,
+  Fraunces, Redaction, Sora. Pair fonts that contrast in style but share a
+  similar x-height. **Space Grotesk and Instrument Serif are now AI-default
+  faces** (see The AI Tells) — they're off the list unless there's a specific
+  reason, and never together.
 - **Long-form reading**: a readable serif (Lora, Newsreader, Source Serif 4).
 - **Code/monospace data**: JetBrains Mono or Geist Mono.
 - Load via `next/font` (self-hosted, no layout shift); prefer variable fonts
@@ -239,8 +515,8 @@ Choose fonts deliberately per project — never one default font for everything.
   surfaces, ~30% secondary, ~10% accent. The accent is what makes the UI feel
   alive — spend it deliberately (primary buttons, active states, key data),
   never everywhere.
-- Pick a real brand accent per project. **Banned**: the default indigo→purple
-  gradient (#6366F1→#A855F7) and generic blue-500-on-white template look.
+- Pick a real brand accent per project. The banned palettes and gradients are
+  listed under **The AI Tells → Color** above; that list is binding here.
 - Tint neutrals warm or cool — never flat pure grays; near-black text on
   near-white (e.g. #0A0A0A on #FAFAFA), not #000 on #FFF.
 - Use **semantic tokens** (`background`, `surface`, `border`, `muted`,
@@ -389,10 +665,10 @@ branded.
 
 - Invoke the `frontend-design` skill for every new page, screen, or
   significant component. Never build UI cold.
-- Apply its "AI slop test" on top of the banned list above: no glassmorphism
-  everywhere, no gradient text, no hero-metric templates, no identical card
-  grids, no nested cards, no modals unless truly necessary. Test: "if someone
-  said AI made this, would they believe it?" If yes, redesign.
+- Before calling any screen done, walk **The AI Tells → Visual tells** and
+  confirm none of them shipped. That section is the checklist; the skill's own
+  "AI slop test" runs on top of it. Final gate: "if someone said AI made this,
+  would I have an argument?" If not, redesign.
 
 ### 4. Refinement passes (a feature isn't "done" until these ran)
 
@@ -711,6 +987,10 @@ Julian Shapiro, Joanna Wiebe, Hormozi, Sam Parr).
 
 ### Never sound AI (hard rules)
 
+> The full catalogue — newer tells, cadence patterns, and the email-specific
+> rules — lives in **The AI Tells → Writing tells / Email tells** above. Read
+> both; this is the short version that applies to every sentence.
+
 - **Never use em dashes** in anything written for humans: UI copy, marketing
   copy, emails, documentation, README files, error messages, etc. Rewrite the
   sentence instead: use a comma, colon, parentheses, or split it into two
@@ -718,11 +998,14 @@ Julian Shapiro, Joanna Wiebe, Hormozi, Sam Parr).
 - **Banned words**: delve, elevate, seamless, effortless, unleash, unlock,
   supercharge, empower, revolutionize, game-changer, cutting-edge, robust,
   leverage (as a verb), streamline, harness, journey, dive in, landscape,
-  realm, tapestry, "in today's fast-paced world".
+  realm, tapestry, testament, underscore (as a verb), pivotal, multifaceted,
+  intricate, meticulous, foster, showcase, world-class, enterprise-grade,
+  quietly, "at scale", "lightning fast", "in today's fast-paced world".
 - **Banned constructions**: "It's not just X, it's Y", "Whether you're A or B",
   "Look no further", rhetorical-question openers, three-item parallel triads in
   every paragraph, exclamation-mark enthusiasm, generic intros and wrap-up
-  conclusions.
+  conclusions, meta-narration ("Here's the part most people miss"), and
+  manufactured-contrast aphorisms as section closers.
 - **The read-aloud test**: if a sentence would sound odd said out loud to a
   friend, rewrite it. Vary sentence length. Short beats long.
 

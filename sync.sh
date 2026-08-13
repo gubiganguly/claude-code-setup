@@ -36,9 +36,28 @@ case "${1:-}" in
     cp ~/Development/aws-platform/README.md ~/Development/aws-platform/ARCHITECTURE.md aws-platform/
     cp ~/Development/aws-platform/terraform/*.tf aws-platform/terraform/
 
+    # The deploy kit. The /deploy skill is only a procedure; the terraform,
+    # templates, and scripts it drives live here. Without it a fresh install
+    # gets a skill that references a directory that does not exist.
+    # Its own .git and any real config are excluded.
+    if [ -d ~/Development/aws-deploy-kit ]; then
+      rm -rf aws-deploy-kit
+      mkdir -p aws-deploy-kit
+      rsync -a \
+        --exclude '.git/' \
+        --exclude '.terraform/' \
+        --exclude '*.tfstate*' \
+        --exclude 'terraform.tfvars' \
+        --exclude 'config.env' \
+        --exclude '.deploy.env' \
+        --exclude '.DS_Store' \
+        ~/Development/aws-deploy-kit/ aws-deploy-kit/
+    fi
+
     echo "Snapshot refreshed from live config ($(date '+%Y-%m-%d %H:%M'))."
-    echo "  commands: $(ls -1 claude/commands/*.md | wc -l | tr -d ' ') files"
-    echo "  skills:   $(ls -1d claude/skills/*/ | wc -l | tr -d ' ') dirs"
+    echo "  commands:   $(ls -1 claude/commands/*.md | wc -l | tr -d ' ') files"
+    echo "  skills:     $(ls -1d claude/skills/*/ | wc -l | tr -d ' ') dirs"
+    echo "  deploy kit: $(find aws-deploy-kit -type f 2>/dev/null | wc -l | tr -d ' ') files"
     ;;
   install)
     mkdir -p ~/.claude/commands ~/.claude/skills
@@ -51,7 +70,10 @@ case "${1:-}" in
       rm -rf ~/.claude/skills/"$n"
       cp -R "$d" ~/.claude/skills/"$n"
     done
-    chmod +x ~/.claude/skills/deploy/templates/terraform-shared/create-db.sh
+    # Restore the executable bit that git does not preserve on copy. Guarded,
+    # because which scripts exist changes between skill versions and this
+    # script runs under `set -e`.
+    find ~/.claude/skills -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 
     if [ ! -d ~/Development/aws-platform ]; then
       mkdir -p ~/Development
@@ -59,6 +81,24 @@ case "${1:-}" in
       echo "NOTE: ~/Development/aws-platform created from snapshot. If the"
       echo "platform already runs in AWS, you also need its terraform.tfstate"
       echo "from the original machine before running terraform there."
+    fi
+
+    if [ -d aws-deploy-kit ] && [ ! -d ~/Development/aws-deploy-kit ]; then
+      mkdir -p ~/Development
+      cp -R aws-deploy-kit ~/Development/aws-deploy-kit
+      find ~/Development/aws-deploy-kit -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
+      echo "Deploy kit installed to ~/Development/aws-deploy-kit"
+    fi
+
+    if [ ! -f ~/.claude/.aws-deploy.env ]; then
+      echo ""
+      echo "ACTION REQUIRED: ~/.claude/.aws-deploy.env does not exist."
+      echo "  The /deploy skill reads account settings from it and will not"
+      echo "  run without one. Create it from claude/aws-deploy.env.example:"
+      echo "    cp claude/aws-deploy.env.example ~/.claude/.aws-deploy.env"
+      echo "    chmod 600 ~/.claude/.aws-deploy.env"
+      echo "  Then fill in the values. It is deliberately NOT in this repo:"
+      echo "  it holds the AWS account ID and the seed admin password."
     fi
 
     echo "Live config installed. See docs/NEW-MACHINE-SETUP.md for the rest."

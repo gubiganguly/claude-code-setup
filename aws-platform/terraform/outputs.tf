@@ -10,23 +10,13 @@ output "vpc_id" {
 }
 
 output "private_subnet_ids" {
-  description = "Private subnets (App Runner VPC connector ENIs)."
+  description = "Private subnets. Currently unused — ECS Express tasks run in the public subnets."
   value       = aws_subnet.private[*].id
 }
 
 output "public_subnet_ids" {
-  description = "Public subnets (NAT, RDS)."
+  description = "Public subnets (ECS Express tasks, NAT, RDS)."
   value       = aws_subnet.public[*].id
-}
-
-output "vpc_connector_arn" {
-  description = "Shared App Runner VPC connector — pass to every project's App Runner service."
-  value       = aws_apprunner_vpc_connector.shared.arn
-}
-
-output "app_runner_egress_sg_id" {
-  description = "SG used by the shared VPC connector."
-  value       = aws_security_group.app_runner_egress.id
 }
 
 output "ecs_egress_sg_id" {

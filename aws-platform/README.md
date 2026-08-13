@@ -19,7 +19,6 @@ via the `/deploy` skill (shared mode). One of these per AWS account
 | Shared egress SG | `platform-ecs-egress` | Attached to every project's tasks; the SG that `platform-rds-sg` trusts for Postgres |
 | RDS SG | `platform-rds-sg` | Opens 5432 only to `platform-ecs-egress` and the operator IPs in `admin_cidrs` |
 | Route 53 zone | `apps.snhcap.com` | Custom domains: each project gets `<project>.apps.snhcap.com` (delegated from GoDaddy via NS records; if the zone is ever recreated, update those NS records) |
-| *(legacy)* App Runner VPC connector | `platform-shared` | Unused leftover from the App Runner era. Nothing depends on it. |
 
 Load balancers do not appear here on purpose: ECS Express creates and manages
 them itself and shares them across services, so they belong to no single

@@ -1,0 +1,177 @@
+# ------------------------------------------------------------------------------
+# deploy.yml — build, push, migrate, deploy.
+#
+# WHAT CHANGED FROM v1
+# v1 ran `prisma migrate deploy` and every seed script inside the container on
+# every boot. That meant a bad migration crash-looped the service with no
+# rollback, and demo seeds were re-applied to production on each restart.
+#
+# Here migrations run ONCE, as a dedicated one-shot Fargate task, before the
+# rolling deploy starts. A failed migration fails the workflow and the running
+# version keeps serving traffic.
+#
+# CONFIGURE: the three `env:` values below. Everything else is generic.
+#
+# REPO VARIABLES (Settings -> Secrets and variables -> Actions -> Variables):
+#   AWS_DEPLOY_ROLE_ARN          terraform output -json github_actions_variables
+#   AWS_ECS_EXECUTION_ROLE_ARN
+#   AWS_ECS_INFRA_ROLE_ARN
+# No repo SECRETS are needed. OIDC means no static AWS keys exist anywhere.
+# ------------------------------------------------------------------------------
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "prisma/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - "docker-entrypoint.sh"
+      - "next.config.*"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: "Skip the migration task (use only to recover a stuck deploy)"
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write # required for OIDC
+  contents: read
+
+# One deploy at a time per branch. Without this, two quick pushes race for the
+# same service and the older image can win.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: REPLACE_ME
+  ECS_SERVICE_NAME: REPLACE_ME
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-deploy-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHA_SHORT="${GITHUB_SHA::7}"
+          REGISTRY="${{ steps.ecr-login.outputs.registry }}"
+          {
+            echo "sha_short=${SHA_SHORT}"
+            echo "image_sha=${REGISTRY}/${ECR_REPOSITORY}:${SHA_SHORT}"
+            echo "image_latest=${REGISTRY}/${ECR_REPOSITORY}:latest"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # Fargate is x86_64. Building arm64 produces "exec format error" at
+          # runtime, which looks like an app crash and is not one.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.image_sha }}
+            ${{ steps.tags.outputs.image_latest }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---------------------------------------------------------------------
+      # Migrations: one task, before the rollout, using the image just built.
+      # If this fails the job stops here and the current version keeps serving.
+      # ---------------------------------------------------------------------
+      - name: Run database migrations
+        if: ${{ !inputs.skip_migrations }}
+        env:
+          IMAGE: ${{ steps.tags.outputs.image_sha }}
+        run: |
+          set -euo pipefail
+
+          TASK_DEF="${ECS_SERVICE_NAME}-migrate"
+          if ! aws ecs describe-task-definition --task-definition "$TASK_DEF" >/dev/null 2>&1; then
+            echo "::warning title=No migration task::Task definition ${TASK_DEF} not found; skipping."
+            exit 0
+          fi
+
+          VPC_ID=$(aws ec2 describe-vpcs \
+            --filters "Name=tag:Name,Values=${PLATFORM_VPC_NAME:-platform-vpc}" \
+            --query 'Vpcs[0].VpcId' --output text)
+          SUBNETS=$(aws ec2 describe-subnets \
+            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Tier,Values=public" \
+            --query 'Subnets[].SubnetId' --output text | tr '\t' ',')
+          SG=$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=${VPC_ID}" "Name=tag:Name,Values=${PLATFORM_EGRESS_SG_NAME:-platform-ecs-egress}" \
+            --query 'SecurityGroups[0].GroupId' --output text)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster default \
+            --task-definition "$TASK_DEF" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${SUBNETS}],securityGroups=[${SG}],assignPublicIp=ENABLED}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"migrate\",\"image\":\"${IMAGE}\"}]}" \
+            --query 'tasks[0].taskArn' --output text)
+
+          echo "migration task ${TASK_ARN##*/} started"
+          aws ecs wait tasks-stopped --cluster default --tasks "$TASK_ARN"
+
+          CODE=$(aws ecs describe-tasks --cluster default --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+
+          aws logs tail "/ecs/${ECS_SERVICE_NAME}-migrate" --since 15m || true
+
+          if [ "$CODE" != "0" ]; then
+            echo "::error title=Migration failed::Exit code ${CODE}. The running version was not replaced."
+            exit 1
+          fi
+          echo "migrations applied"
+
+      - name: Deploy to ECS Express
+        id: deploy
+        uses: aws-actions/amazon-ecs-deploy-express-service@v1
+        with:
+          service-name: ${{ env.ECS_SERVICE_NAME }}
+          cluster: default
+          image: ${{ steps.tags.outputs.image_sha }}
+          execution-role-arn: ${{ vars.AWS_ECS_EXECUTION_ROLE_ARN }}
+          infrastructure-role-arn: ${{ vars.AWS_ECS_INFRA_ROLE_ARN }}
+          container-port: "3000"
+          health-check-path: /api/health
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`${{ steps.tags.outputs.sha_short }}\` |"
+            echo "| Endpoint | ${{ steps.deploy.outputs.endpoint }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
