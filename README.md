@@ -107,3 +107,19 @@ This folder is a **copy**, not the live config. After meaningful changes to
 ```
 
 Snapshot last refreshed: 2026-08-13.
+
+## Two remotes, one push
+
+`origin` is configured with two push URLs, so a single `git push` updates both
+accounts:
+
+```
+gubi-ganguly/claude-code-setup   (primary)
+gubiganguly/claude-code-setup    (secondary)
+```
+
+Both are SSH and both are private. The one SSH key reaches the secondary
+because `gubi-ganguly` holds write access there as a collaborator. `git fetch`
+and `git pull` still read from the primary only.
+
+To push to just one: `git push secondary main`, or use the explicit URL.
