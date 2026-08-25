@@ -50,6 +50,18 @@ undone.
 Confirm tooling: `docker` running, `terraform -version` at least 1.11,
 `gh auth status`.
 
+**Confirm the Terraform plugin cache exists**, or this deploy adds another
+~700 MB copy of the AWS provider to the disk:
+
+```bash
+grep -q plugin_cache_dir ~/.terraformrc 2>/dev/null && ls -d ~/.terraform.d/plugin-cache \
+  || echo "NO SHARED PLUGIN CACHE — see references/gotchas.md, Local disk hygiene"
+```
+
+Both halves matter. Terraform silently ignores `plugin_cache_dir` when the
+directory does not exist, so the config alone is not enough. Sixteen projects
+without it held 15 GB of identical binaries.
+
 ## Step 1 — Decide first-deploy vs redeploy
 
 **Redeploy** if `infra/terraform/` exists AND the service exists:

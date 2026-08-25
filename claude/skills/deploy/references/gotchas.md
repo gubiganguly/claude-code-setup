@@ -12,6 +12,67 @@ Every one of these has cost someone real hours. Check here before debugging.
 | `timeout while waiting for plugin to start`, hangs forever on Apple Silicon | x86_64 Terraform crashing under Rosetta | Install the darwin_arm64 binary, then `rm -rf .terraform && terraform init -upgrade` |
 | Changing an SG `description` forces replacement | `description` is ForceNew in the AWS provider | Leave it. If the SG is attached to RDS, replacing it bounces the database |
 | Apply: OIDC provider "already exists" | Only one per account | Set `create_github_oidc_provider = false` in bootstrap |
+| Disk fills up; `.terraform` directories are ~700 MB each | Every `terraform init` downloads its own private copy of the AWS provider | Configure the shared plugin cache (below). Measured: 16 projects held 15 GB of the same binaries |
+| `plugin_cache_dir` is set but providers are still copied | **Terraform silently ignores the setting when the directory does not exist.** It will not create it | `mkdir -p ~/.terraform.d/plugin-cache`, then `rm -rf .terraform && terraform init` in each project |
+
+## Local disk hygiene
+
+Terraform and Docker both cache aggressively and neither ever cleans up. On one
+machine this reached **127 GB**: 15 GB of duplicated Terraform providers and
+112 GB of Docker build cache.
+
+**Terraform: share one copy of each provider.** Create `~/.terraformrc`:
+
+```hcl
+plugin_cache_dir = "/Users/<you>/.terraform.d/plugin-cache"
+```
+
+Then **create the directory**, which is the step people miss:
+
+```bash
+mkdir -p ~/.terraform.d/plugin-cache
+```
+
+Existing projects keep their private copies until re-initialised. To reclaim:
+
+```bash
+find . -type d -name .terraform -prune -exec rm -rf {} +
+terraform init            # providers are now symlinked into the cache
+```
+
+`.terraform/` is regenerable and holds no real state, so deleting it is safe.
+Local state lives in `terraform.tfstate` **beside** it, never inside. Verify
+before deleting anywhere unfamiliar.
+
+**Docker: the build cache is usually the whole problem.**
+
+```bash
+docker system df          # look at the Build Cache row
+docker builder prune -af  # clears it
+```
+
+Two traps in that output:
+
+- The `RECLAIMABLE` column **understates build cache badly**. It counts only
+  cache unused by a current build. A row reading "112.8 GB total, 17.29 GB
+  reclaimable" freed the full 112.8 GB.
+- `Docker.raw` is a sparse image that reports its ceiling, not its usage. Use
+  `du -sh`, not `ls -lh`. It usually self-compacts within a minute of a prune;
+  if it does not, rebuild it from Docker Desktop → Settings → Resources.
+
+**Never run `docker system prune --volumes` without checking first.** Named
+volumes hold local dev databases (`<project>_postgres-data` and similar).
+On the audited machine all volumes totalled 311 MB with **0 B reclaimable**, so
+the flag would have destroyed local Postgres data to free nothing.
+
+```bash
+docker volume ls          # look for named volumes before pruning anything
+```
+
+**Images:** ECR-backed tags are re-pullable and safe to delete. Locally-built
+tags (`:test`, `:local`, `:lean`, anything with no registry prefix) may exist
+nowhere else and may not be reproducible if their Dockerfile was never
+committed. Delete the first group freely, the second only deliberately.
 
 ## Service will not start or stay healthy
 

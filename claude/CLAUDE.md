@@ -170,6 +170,21 @@ than dropping the context on the floor.
   so use it only when isolation is genuinely required.
 - **Sizing**: default new services to 512 CPU / 1024 MiB. Raise only on measured
   CloudWatch CPU, never on instinct.
+- **Local disk**: Terraform and Docker both cache without limit and never clean
+  up. Two standing requirements, because together they reached 127 GB on one
+  machine:
+  - `~/.terraformrc` sets `plugin_cache_dir`, **and that directory exists**.
+    Terraform silently ignores the setting when it doesn't, and every project
+    then keeps its own ~700 MB copy of the AWS provider.
+  - Docker's build cache is usually the largest thing on the disk. Check it with
+    `docker system df` and clear it with `docker builder prune -af`. Its
+    `RECLAIMABLE` column understates the true figure badly.
+  - **Never `docker system prune --volumes`** without running `docker volume ls`
+    first. Named volumes hold local dev databases and are typically 0 B
+    reclaimable, so the flag destroys data to free nothing.
+  - Deleting `.terraform/` is safe; real state lives in `terraform.tfstate`
+    beside it. Deleting locally-built images (`:test`, `:local`, no registry
+    prefix) is not always safe, since they may exist nowhere else.
 
 ### Account-specific values live in a config file, never in this file
 
@@ -1094,5 +1109,34 @@ Default to using agent teams for any task that involves more than one independen
 
 ## Response Format
 
-- **Always end every response with a `**TLDR**` section**: 1-3 short sentences summarizing what was done, found, or decided. Keep it plain language, no jargon. This applies to every response, even short ones.
-- **After the TLDR, add a `**Next step**` line**: one concrete recommended action — the single most valuable thing to do next (e.g. "test the flow on staging", "run /deploy", "add X to Y"). One suggestion, not a list. If there's genuinely nothing to do next, say so rather than inventing one.
+Every response ends with these three, in this order.
+
+- **`**TLDR**`**: 1-3 short sentences summarizing what was done, found, or
+  decided. Plain language, no jargon. Every response, even short ones.
+- **`**Next step**`**: one concrete recommended action, the single most
+  valuable thing to do next (e.g. "test the flow on staging", "run /deploy",
+  "add X to Y"). One suggestion, not a list. If there's genuinely nothing to do
+  next, say so rather than inventing one.
+- **`**Blockers**`**: what stands between here and that next step. Answer the
+  question "can this proceed, and if not, what do you need from me?"
+
+### What counts as a blocker
+
+Only things that actually stop the next step:
+
+- **A decision only the user can make** — which of two approaches, whether to
+  delete something, whether a cost is acceptable.
+- **Missing data or access** — a credential, a file, a URL, an account, a value
+  that isn't in the config. Name the specific thing, not "more information".
+- **An unverified assumption the work depends on** — something believed but not
+  confirmed, where being wrong wastes the effort. Say what would confirm it.
+- **An external dependency** — waiting on a person, a vendor, a CI run, a DNS
+  change, someone else's approval.
+
+**Write `None` when there are none.** That is the common case and it is
+informative: it tells the user the next step can start immediately. Never pad
+this line to look thorough, and never restate a risk that does not actually
+block anything — that belongs in the body.
+
+If there IS a blocker, say what you need in the form the user can act on:
+"Need the Redshift host from UBS" beats "blocked on external configuration".
