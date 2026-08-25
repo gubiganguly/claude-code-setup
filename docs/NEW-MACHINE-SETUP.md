@@ -102,6 +102,35 @@ If `commands/` has only `setup.md`, you are running an old snapshot that
 predates 2026-08-03. The global CLAUDE.md references `/polish`, `/critique`,
 `/audit`, `/teach-impeccable` and others, and they will silently not exist.
 
+## 5a. Terraform provider cache (done for you by sync.sh install)
+
+`sync.sh install` creates `~/.terraform.d/plugin-cache` and adds
+`plugin_cache_dir` to `~/.terraformrc`, so every project shares one copy of each
+provider instead of downloading its own.
+
+This matters more than it sounds. Without it, each project's `terraform init`
+pulls a private ~700 MB copy of the AWS provider; sixteen projects on one
+machine held 15 GB of identical binaries. Terraform also **silently ignores
+`plugin_cache_dir` when the directory does not exist**, so the setting alone is
+not enough, which is why the script creates both.
+
+Verify:
+
+```bash
+cat ~/.terraformrc && ls -d ~/.terraform.d/plugin-cache
+```
+
+If you are adopting an existing machine, projects initialised before the cache
+existed keep their private copies. Reclaim that space with:
+
+```bash
+find ~/Portcos ~/Development -type d -name .terraform -prune -exec rm -rf {} +
+# then `terraform init` in each project you still use
+```
+
+`.terraform/` is regenerable and holds no real state; local state lives in
+`terraform.tfstate` beside it.
+
 ## 5b. Plugins (not installed by sync.sh)
 
 Some skills come from plugins rather than this repo, and `sync.sh` cannot

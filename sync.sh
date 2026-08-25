@@ -90,6 +90,27 @@ case "${1:-}" in
       echo "Deploy kit installed to ~/Development/aws-deploy-kit"
     fi
 
+    # Shared Terraform provider cache.
+    #
+    # Without this every project's `terraform init` downloads its own ~700 MB
+    # copy of the AWS provider. Sixteen projects on one machine held 15 GB of
+    # identical binaries. Terraform SILENTLY IGNORES plugin_cache_dir when the
+    # directory does not exist, so both halves are done here.
+    #
+    # plugin_cache_dir does not expand ~, so the path is written out in full.
+    TF_CACHE="$HOME/.terraform.d/plugin-cache"
+    mkdir -p "$TF_CACHE"
+    if [ ! -f ~/.terraformrc ]; then
+      cat > ~/.terraformrc <<EOF
+# Share one copy of each provider version across all projects.
+plugin_cache_dir = "$TF_CACHE"
+EOF
+      echo "Created ~/.terraformrc with a shared provider cache."
+    elif ! grep -q plugin_cache_dir ~/.terraformrc; then
+      printf '\n# Added by sync.sh: share one provider copy across projects.\nplugin_cache_dir = "%s"\n' "$TF_CACHE" >> ~/.terraformrc
+      echo "Added plugin_cache_dir to your existing ~/.terraformrc."
+    fi
+
     if [ ! -f ~/.claude/.aws-deploy.env ]; then
       echo ""
       echo "ACTION REQUIRED: ~/.claude/.aws-deploy.env does not exist."
